@@ -3,8 +3,11 @@ import { z } from "zod";
 
 const EnvSchema = z.object({
   DATABASE_URL: z.url(),
-  UPSTASH_REDIS_REST_URL: z.url(),
-  UPSTASH_REDIS_REST_TOKEN: z.string().min(1),
+  // Upstash Redis credentials. The Vercel Marketplace Upstash integration
+  // provisions these under the legacy Vercel KV names (KV_REST_API_*) for
+  // backward compatibility, so that's what we read.
+  KV_REST_API_URL: z.url(),
+  KV_REST_API_TOKEN: z.string().min(1),
   // AI Gateway auth: short-lived OIDC token. Auto-injected on Vercel; refreshed
   // locally via `vercel env pull`.
   VERCEL_OIDC_TOKEN: z.string().min(1),
