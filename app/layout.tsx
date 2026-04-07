@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import { Inter, Fraunces } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
+import { Toaster } from "@/components/ui/sonner";
+import { Footer } from "@/components/footer";
 
 const inter = Inter({
   variable: "--font-sans",
@@ -15,8 +18,8 @@ const fraunces = Fraunces({
 });
 
 export const metadata: Metadata = {
-  title: "Story Arena",
-  description: "Compare AI-generated stories side by side.",
+  title: "Story Arena — Three AIs. One prompt. You decide.",
+  description: "Vote blind on fictional stories from frontier language models.",
 };
 
 export default function RootLayout({
@@ -29,7 +32,10 @@ export default function RootLayout({
       <body
         className={`${inter.variable} ${fraunces.variable} min-h-full flex flex-col`}
       >
-        {children}
+        <main className="min-h-[calc(100vh-8rem)]">{children}</main>
+        <Footer />
+        <Toaster />
+        <Analytics />
       </body>
     </html>
   );
