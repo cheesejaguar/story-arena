@@ -1,6 +1,7 @@
 import {
-  pgTable, pgEnum, uuid, text, timestamp, integer, boolean, jsonb, index,
+  pgTable, pgEnum, uuid, text, timestamp, integer, boolean, jsonb, index, uniqueIndex, check, foreignKey,
 } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 
 export const slotEnum = pgEnum("slot_label", ["A", "B", "C"]);
 export const runStatusEnum = pgEnum("run_status", ["pending", "complete", "failed"]);
@@ -18,10 +19,12 @@ export const runs = pgTable("runs", {
   normalizedPrompt: text("normalized_prompt").notNull(),
   moderationStatus: moderationStatusEnum("moderation_status").notNull(),
   systemPromptVersion: text("system_prompt_version").notNull(),
-  status: runStatusEnum("status").notNull(),
+  status: runStatusEnum("status").notNull().default("pending"),
+  completedAt: timestamp("completed_at", { withTimezone: true }),
 }, (t) => [
   index("runs_session_idx").on(t.sessionId),
   index("runs_created_idx").on(t.createdAt),
+  check("runs_prompt_text_len", sql`length(prompt_text) <= 4000`),
 ]);
 
 export const storyOutputs = pgTable("story_outputs", {
@@ -41,7 +44,7 @@ export const storyOutputs = pgTable("story_outputs", {
   rawResponseJson: jsonb("raw_response_json"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  index("story_outputs_run_idx").on(t.runId),
+  uniqueIndex("story_outputs_run_slot_unique").on(t.runId, t.slotLabel),
 ]);
 
 export const votes = pgTable("votes", {
@@ -59,6 +62,12 @@ export const votes = pgTable("votes", {
   fraudScore: integer("fraud_score").default(0).notNull(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, (t) => [
-  index("votes_run_unique").on(t.runId, t.sessionId),
+  uniqueIndex("votes_run_session_unique").on(t.runId, t.sessionId),
   index("votes_model_idx").on(t.chosenModelSlug),
+  check("votes_reason_text_len", sql`reason_text IS NULL OR length(reason_text) <= 1000`),
+  foreignKey({
+    columns: [t.runId, t.chosenSlot],
+    foreignColumns: [storyOutputs.runId, storyOutputs.slotLabel],
+    name: "votes_run_slot_fk",
+  }).onDelete("cascade"),
 ]);
