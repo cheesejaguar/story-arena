@@ -8,6 +8,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-sans);
+  --font-serif: var(--font-serif);
   --font-mono: var(--font-geist-mono);
   --font-heading: var(--font-sans);
   --color-sidebar-ring: var(--sidebar-ring);
@@ -127,4 +128,10 @@
   html {
     @apply font-sans;
   }
+}
+
+@utility story-prose {
+  font-family: var(--font-serif);
+  line-height: 1.75;
+  max-width: 65ch;
 }
