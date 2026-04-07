@@ -13,5 +13,14 @@ export default defineConfig({
     environment: "node",
     setupFiles: ["tests/setup.ts"],
   },
-  resolve: { alias: { "@": path.resolve(__dirname, ".") } },
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "."),
+      // server-only throws when imported in client/test contexts; alias to empty.
+      "server-only": path.resolve(
+        __dirname,
+        "node_modules/server-only/empty.js",
+      ),
+    },
+  },
 });

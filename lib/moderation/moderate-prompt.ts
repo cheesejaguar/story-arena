@@ -33,6 +33,8 @@ const SYSTEM_PROMPT = [
 export async function moderatePrompt(
   promptText: string,
 ): Promise<ModerationResult> {
+  if (process.env.MOCK_AI === "1") return { allowed: true };
+
   const trimmed = promptText.trim();
   if (trimmed.length < 4) {
     return { allowed: false, reason: "Prompt too short" };

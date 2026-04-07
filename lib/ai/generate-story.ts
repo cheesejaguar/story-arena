@@ -22,6 +22,23 @@ export type GenerateInput = {
 export async function generateStory(
   input: GenerateInput,
 ): Promise<GeneratedStory> {
+  // Test/CI shortcut: skip the real AI Gateway call and return deterministic
+  // canned text. Enabled by setting MOCK_AI=1 in the environment.
+  if (process.env.MOCK_AI === "1") {
+    return {
+      modelSlug: input.modelSlug,
+      outputText: `[MOCK ${input.modelSlug}] A short story for prompt "${input.prompt.slice(0, 60)}..."
+
+It was a quiet evening when the lighthouse beam first faltered. The keeper had spent forty years on the rock and could feel the change in the air before the bulb hissed.
+
+What came next would take three nights to understand.`,
+      latencyMs: 5,
+      tokenInput: 10,
+      tokenOutput: 80,
+      finishReason: "stop",
+    };
+  }
+
   const t0 = Date.now();
   // No explicit Authorization header — the AI SDK gateway provider auto-resolves
   // VERCEL_OIDC_TOKEN from process.env (auto-injected and auto-rotated by Vercel).
