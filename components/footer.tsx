@@ -12,12 +12,12 @@ export function Footer() {
             Published on the open web
           </span>
         </div>
-        <nav className="flex items-center gap-6">
+        <nav className="flex items-center gap-5">
           <Link
-            href="/about"
+            href="/judge"
             className="editorial-caps text-ink-muted transition-colors hover:text-oxblood"
           >
-            Colophon
+            The Bench
           </Link>
           <span className="text-ink-faint">·</span>
           <Link
@@ -25,6 +25,13 @@ export function Footer() {
             className="editorial-caps text-ink-muted transition-colors hover:text-oxblood"
           >
             Standings
+          </Link>
+          <span className="text-ink-faint">·</span>
+          <Link
+            href="/about"
+            className="editorial-caps text-ink-muted transition-colors hover:text-oxblood"
+          >
+            Colophon
           </Link>
         </nav>
       </div>

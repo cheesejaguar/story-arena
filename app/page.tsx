@@ -1,4 +1,5 @@
 import { cookies } from "next/headers";
+import Link from "next/link";
 import { PromptForm } from "@/components/prompt-form";
 
 export default async function HomePage() {
@@ -20,9 +21,28 @@ export default async function HomePage() {
           <span className="masthead-caps text-ink">
             <span className="text-oxblood">❦</span>&nbsp;&nbsp;Story&nbsp;·&nbsp;Arena
           </span>
-          <span className="hidden masthead-caps text-ink-muted sm:block">
-            A Blind Benchmark in Fiction
-          </span>
+          <nav className="hidden items-center gap-5 masthead-caps text-ink-muted sm:flex">
+            <Link
+              href="/judge"
+              className="transition-colors hover:text-oxblood"
+            >
+              The Bench
+            </Link>
+            <span className="text-ink-faint">·</span>
+            <Link
+              href="/results"
+              className="transition-colors hover:text-oxblood"
+            >
+              Standings
+            </Link>
+            <span className="text-ink-faint">·</span>
+            <Link
+              href="/about"
+              className="transition-colors hover:text-oxblood"
+            >
+              Colophon
+            </Link>
+          </nav>
           <span className="masthead-caps text-ink-muted">
             Vol. I &nbsp;·&nbsp; N°1 &nbsp;·&nbsp; MMXXVI
           </span>
@@ -62,6 +82,18 @@ export default async function HomePage() {
         {/* Tiny editorial byline */}
         <p className="rise-in rise-in-3 mt-6 editorial-caps text-ink-faint">
           Filed {issueDate} &nbsp;·&nbsp; A Living Dataset
+        </p>
+
+        {/* Quick link to judge mode */}
+        <p className="rise-in rise-in-3 mt-8 font-serif text-sm italic text-ink-muted">
+          Or{" "}
+          <Link
+            href="/judge"
+            className="not-italic editorial-caps text-oxblood underline decoration-[1.5px] underline-offset-4 hover:text-oxblood-deep"
+          >
+            judge a story someone else wrote
+          </Link>
+          .
         </p>
       </section>
 

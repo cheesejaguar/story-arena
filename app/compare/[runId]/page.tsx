@@ -19,16 +19,27 @@ export default async function ComparePage({ params }: PageProps) {
 
   if (data.run.status !== "complete") {
     return (
-      <div className="mx-auto max-w-2xl px-6 pt-24 text-center">
-        <h1 className="font-serif text-3xl">This run isn&apos;t ready</h1>
-        <p className="mt-3 text-muted-foreground">
+      <div className="mx-auto max-w-xl px-6 pt-32 text-center">
+        <div className="mx-auto mb-6 flex max-w-xs items-center gap-4">
+          <span className="hairline flex-1" />
+          <span className="text-oxblood text-sm leading-none">❦</span>
+          <span className="hairline flex-1" />
+        </div>
+        <p className="editorial-caps text-ink-muted">The Press</p>
+        <h1 className="mt-4 font-display text-3xl italic text-ink">
+          This run isn&apos;t ready.
+        </h1>
+        <p className="mt-4 font-serif italic text-ink-muted">
           {data.run.status === "failed"
             ? "One or more models failed to generate. Try a fresh prompt."
             : "Stories are still being generated. Refresh in a moment."}
         </p>
-        <p className="mt-6">
-          <Link href="/" className="underline underline-offset-4">
-            Try another prompt
+        <p className="mt-10">
+          <Link
+            href="/"
+            className="editorial-caps text-ink underline decoration-oxblood decoration-[1.5px] underline-offset-[6px] hover:text-oxblood"
+          >
+            Write a new prompt →
           </Link>
         </p>
       </div>
@@ -42,11 +53,9 @@ export default async function ComparePage({ params }: PageProps) {
 
   return (
     <div className="mx-auto max-w-7xl px-6 pt-12 pb-16">
-      <header className="mx-auto mb-10 max-w-3xl text-center">
-        <p className="mb-2 text-xs uppercase tracking-wider text-muted-foreground">
-          Your prompt
-        </p>
-        <p className="font-serif text-xl italic leading-relaxed text-foreground/90">
+      <header className="mx-auto mb-12 max-w-3xl text-center">
+        <p className="editorial-caps text-ink-muted">Your prompt</p>
+        <p className="mt-4 font-display text-xl italic leading-relaxed text-ink sm:text-2xl">
           &ldquo;{data.run.promptText}&rdquo;
         </p>
       </header>
