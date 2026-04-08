@@ -1,7 +1,9 @@
 import { test, expect } from "@playwright/test";
 
 test.describe("Story Arena happy path", () => {
-  test("user can submit a prompt, vote, and see reveal", async ({ page }) => {
+  test("user can submit a prompt, watch live streams, vote, and see reveal", async ({
+    page,
+  }) => {
     // 1. Land on homepage
     await page.goto("/");
     await expect(
@@ -16,14 +18,19 @@ test.describe("Story Arena happy path", () => {
     // 3. Submit
     await page.getByRole("button", { name: /generate stories/i }).click();
 
-    // 4. Wait for the compare page (mocked AI is fast)
-    await page.waitForURL(/\/compare\//, { timeout: 30_000 });
-    await expect(page.getByText(/Story A/i).first()).toBeVisible();
-    await expect(page.getByText(/Story B/i).first()).toBeVisible();
-    await expect(page.getByText(/Story C/i).first()).toBeVisible();
+    // 4. Streaming view appears in-place (no navigation). Wait for all 3
+    //    story headers to render as the stream opens.
+    await expect(page.getByText("Story A", { exact: false }).first()).toBeVisible({
+      timeout: 30_000,
+    });
+    await expect(page.getByText("Story B", { exact: false }).first()).toBeVisible();
+    await expect(page.getByText("Story C", { exact: false }).first()).toBeVisible();
 
-    // 5. Read all three so allStoriesViewed becomes true (scroll to bring each into view)
-    // (On desktop the IntersectionObserver should fire for all three on initial render)
+    // 5. Wait for the run to finish streaming — the status line flips to
+    //    "All three pens have finished" when the done event arrives.
+    await expect(
+      page.getByText(/all three pens have finished/i),
+    ).toBeVisible({ timeout: 30_000 });
 
     // 6. Click Story B to select it
     await page.getByRole("button", { name: /Story B/i }).first().click();

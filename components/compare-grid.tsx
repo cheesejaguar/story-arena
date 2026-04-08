@@ -21,6 +21,8 @@ export type CompareGridProps = {
   onSelect: (slot: Slot) => void;
   onViewed?: (slot: Slot) => void;
   onScrollDepth?: (slot: Slot, depth: number) => void;
+  /** Optional hook — when returns true for a slot, that card shows a "writing…" shimmer. */
+  renderStreaming?: (slot: Slot) => boolean;
 };
 
 export function CompareGrid({
@@ -30,12 +32,14 @@ export function CompareGrid({
   onSelect,
   onViewed,
   onScrollDepth,
+  renderStreaming,
 }: CompareGridProps) {
   const cardProps = (s: CompareStory): StoryCardProps => ({
     slot: s.slot,
     text: s.text,
     selected: selectedSlot === s.slot,
     disabled,
+    streaming: renderStreaming ? renderStreaming(s.slot) : false,
     onSelect: () => onSelect(s.slot),
     onViewed: onViewed ? () => onViewed(s.slot) : undefined,
     onScrollDepth: onScrollDepth ? (d) => onScrollDepth(s.slot, d) : undefined,

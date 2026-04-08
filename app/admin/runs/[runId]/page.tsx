@@ -5,6 +5,7 @@ import { getRunWithOutputs } from "@/lib/db/queries";
 import { BENCHMARK_MODELS } from "@/lib/ai/models";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { StoryMarkdown } from "@/components/story-markdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -78,9 +79,9 @@ export default async function AdminRunDetailPage({ params }: PageProps) {
                   {o.modelSlug}
                 </p>
                 <div className="mt-3 max-h-64 overflow-y-auto pr-2">
-                  <p className="story-prose text-sm whitespace-pre-wrap">
-                    {o.outputText}
-                  </p>
+                  <div className="story-prose text-sm max-w-none">
+                    <StoryMarkdown text={o.outputText} />
+                  </div>
                 </div>
                 <p className="mt-3 font-mono text-[10px] text-muted-foreground">
                   {o.latencyMs}ms · {o.tokenInput ?? "?"} in / {o.tokenOutput ?? "?"} out

@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
+import { StoryMarkdown } from "./story-markdown";
 import type { Slot } from "@/lib/utils/randomize-slots";
 
 export type StoryCardProps = {
@@ -10,6 +11,8 @@ export type StoryCardProps = {
   text: string;
   selected: boolean;
   disabled?: boolean;
+  /** When true, show a "writing…" shimmer instead of plain empty. */
+  streaming?: boolean;
   onSelect: () => void;
   onViewed?: () => void;
   onScrollDepth?: (depth: number) => void;
@@ -20,6 +23,7 @@ export function StoryCard({
   text,
   selected,
   disabled,
+  streaming,
   onSelect,
   onViewed,
   onScrollDepth,
@@ -75,11 +79,6 @@ export function StoryCard({
     onSelect();
   }
 
-  const paragraphs = text
-    .split(/\n{2,}/)
-    .map((p) => p.trim())
-    .filter(Boolean);
-
   return (
     <div ref={wrapperRef}>
       <Card
@@ -100,26 +99,49 @@ export function StoryCard({
           selected &&
             "ring-2 ring-foreground/80 ring-offset-2 ring-offset-background",
           disabled && "cursor-not-allowed opacity-60",
+          streaming && "cursor-default",
         )}
       >
-        <header className="mb-4 flex items-baseline justify-between">
-          <h2 className="font-serif text-lg font-medium tracking-wide text-muted-foreground">
-            Story {slot}
+        <header className="mb-5 flex items-baseline justify-between">
+          <h2 className="editorial-caps text-ink-muted">
+            <span className="text-oxblood">❦</span>&nbsp;&nbsp;Story&nbsp;{slot}
           </h2>
-          {selected && (
-            <span className="text-xs font-medium uppercase tracking-wider text-foreground/70">
-              Your pick
+          {streaming ? (
+            <span className="editorial-caps text-ink-faint animate-pulse">
+              Writing…
             </span>
-          )}
+          ) : selected ? (
+            <span className="editorial-caps text-oxblood">Your pick</span>
+          ) : null}
         </header>
-        <div className="story-prose">
-          {paragraphs.map((p, i) => (
-            <p key={i} className="mb-4 last:mb-0">
-              {p}
-            </p>
-          ))}
+        <div className="story-prose max-w-none text-ink">
+          {text.length === 0 && streaming ? (
+            <StreamingSkeleton />
+          ) : (
+            <StoryMarkdown text={text} />
+          )}
+          {streaming && text.length > 0 && (
+            <span
+              aria-hidden
+              className="inline-block w-[0.4em] h-[1.1em] ml-0.5 translate-y-[0.15em] bg-ink/60 animate-pulse"
+            />
+          )}
         </div>
       </Card>
+    </div>
+  );
+}
+
+/**
+ * Three grey lines that hint at an empty manuscript waiting for ink.
+ * Only shown for the brief window before the first delta arrives.
+ */
+function StreamingSkeleton() {
+  return (
+    <div className="space-y-2">
+      <div className="h-4 w-full rounded bg-paper-deep animate-pulse" />
+      <div className="h-4 w-[92%] rounded bg-paper-deep animate-pulse" />
+      <div className="h-4 w-[85%] rounded bg-paper-deep animate-pulse" />
     </div>
   );
 }
