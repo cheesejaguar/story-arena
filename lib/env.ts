@@ -8,9 +8,12 @@ const EnvSchema = z.object({
   // backward compatibility, so that's what we read.
   KV_REST_API_URL: z.url(),
   KV_REST_API_TOKEN: z.string().min(1),
-  // AI Gateway auth: short-lived OIDC token. Auto-injected on Vercel; refreshed
-  // locally via `vercel env pull`.
-  VERCEL_OIDC_TOKEN: z.string().min(1),
+  // AI Gateway auth: short-lived OIDC token. Auto-injected on Vercel when AI
+  // Gateway is enabled on the project; refreshed locally via `vercel env pull`.
+  // Optional so non-AI routes (e.g. /results, /admin, /about) can boot even
+  // when AI Gateway is not yet provisioned. The AI SDK reads it directly from
+  // process.env at call time and will throw a 502 if missing.
+  VERCEL_OIDC_TOKEN: z.string().min(1).optional(),
   ADMIN_SECRET: z.string().min(32),
   SESSION_COOKIE_SECRET: z.string().min(32),
   SYSTEM_PROMPT_VERSION: z.string().default("v1"),
