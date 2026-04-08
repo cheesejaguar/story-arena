@@ -36,8 +36,8 @@ export function PromptForm() {
           res.status === 429
             ? "You're going too fast. Try again in a bit."
             : res.status === 422
-            ? data.error || "That prompt was blocked by moderation."
-            : data.error || "Something went wrong. Try again.";
+              ? data.error || "That prompt was blocked by moderation."
+              : data.error || "Something went wrong. Try again.";
         toast.error(msg);
         setSubmitting(false);
         return;
@@ -50,41 +50,75 @@ export function PromptForm() {
     }
   }
 
+  const charCount = prompt.trim().length;
+  const canSubmit = charCount >= 4 && !submitting;
+
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
-      <div className="space-y-3">
+    <form onSubmit={handleSubmit} className="space-y-10">
+      {/* ── Prompt section ──────────────────────────────────────────── */}
+      <div>
+        <div className="mb-4 flex items-baseline gap-4">
+          <span className="editorial-caps text-ink-muted">
+            <span className="text-oxblood">§</span>&nbsp;&nbsp;The Prompt
+          </span>
+          <span className="hairline flex-1" />
+          <span className="editorial-caps text-ink-faint tabular-nums">
+            {charCount.toString().padStart(4, "0")} / 4000
+          </span>
+        </div>
+
         <Textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Write a fictional prompt. A scene, a what-if, a character at a turning point..."
-          rows={4}
+          placeholder="Write a fictional prompt. A scene, a what-if, a character at a turning point, a single image that demands a story…"
+          rows={5}
           disabled={submitting}
-          className="resize-none border-border bg-card text-base leading-relaxed font-serif"
           maxLength={4000}
+          className="resize-none rounded-none border-0 border-y border-ink/80 bg-transparent px-0 py-5 font-serif text-lg italic leading-relaxed text-ink placeholder:text-ink-faint placeholder:italic focus-visible:border-oxblood focus-visible:ring-0 focus-visible:ring-offset-0"
         />
-        <ExamplePrompts onPick={(t) => setPrompt(t)} />
       </div>
 
-      <div className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <span className="text-sm text-muted-foreground">Length</span>
-          <LengthPicker value={length} onChange={setLength} disabled={submitting} />
+      {/* ── Example prompts from the archive ────────────────────────── */}
+      <ExamplePrompts onPick={(t) => setPrompt(t)} />
+
+      {/* ── Submission row ──────────────────────────────────────────── */}
+      <div>
+        <div className="mb-6 flex items-center gap-4">
+          <span className="hairline flex-1" />
+          <span className="text-oxblood text-sm leading-none">❦</span>
+          <span className="hairline flex-1" />
         </div>
-        <Button
-          type="submit"
-          size="lg"
-          disabled={submitting || prompt.trim().length < 4}
-          className="min-w-[10rem]"
-        >
-          {submitting ? "Generating stories…" : "Generate stories"}
-        </Button>
-      </div>
 
-      {submitting && (
-        <p className="text-center text-xs text-muted-foreground">
-          Three frontier models are writing in parallel. This usually takes 20–60 seconds.
-        </p>
-      )}
+        <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-baseline sm:justify-between">
+          <div className="flex items-center gap-4">
+            <span className="editorial-caps text-ink-muted">Length</span>
+            <LengthPicker value={length} onChange={setLength} disabled={submitting} />
+          </div>
+
+          <Button
+            type="submit"
+            size="lg"
+            disabled={!canSubmit}
+            className="group relative rounded-none border border-ink bg-ink px-8 py-6 font-display text-lg italic font-normal text-paper shadow-none transition-all hover:bg-oxblood-deep hover:border-oxblood-deep disabled:border-rule disabled:bg-paper-deep disabled:text-ink-faint"
+          >
+            <span className="editorial-caps mr-3 text-paper/60 group-hover:text-paper/70 group-disabled:text-ink-faint">
+              {submitting ? "Setting type" : "Generate stories"}
+            </span>
+            <span className="text-xl not-italic">
+              {submitting ? "…" : "→"}
+            </span>
+          </Button>
+        </div>
+
+        {submitting && (
+          <div className="mt-6 text-center">
+            <p className="font-serif italic text-sm text-ink-muted">
+              Three frontier models are composing in parallel. The press runs
+              slowly — <span className="text-ink">expect 20 to 60 seconds</span>.
+            </p>
+          </div>
+        )}
+      </div>
     </form>
   );
 }

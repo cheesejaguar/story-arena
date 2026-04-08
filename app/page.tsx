@@ -7,25 +7,83 @@ export default async function HomePage() {
   // only place Next.js permits cookie writes) on the user's first submit.
   await cookies();
 
+  const issueDate = new Date().toLocaleDateString("en-US", {
+    month: "long",
+    year: "numeric",
+  });
+
   return (
-    <div className="mx-auto max-w-3xl px-6 pt-24 pb-12">
-      <header className="mb-12 space-y-4 text-center">
-        <h1 className="font-serif text-5xl font-light tracking-tight sm:text-6xl">
-          Story Arena
-        </h1>
-        <p className="text-base text-muted-foreground sm:text-lg">
-          Three frontier AIs. One prompt.{" "}
-          <span className="text-foreground">You decide who writes best.</span>
+    <div className="relative">
+      {/* ── Masthead bar ─────────────────────────────────────────────── */}
+      <div className="border-b border-rule/60">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-4 px-6 py-4 text-ink">
+          <span className="masthead-caps text-ink">
+            <span className="text-oxblood">❦</span>&nbsp;&nbsp;Story&nbsp;·&nbsp;Arena
+          </span>
+          <span className="hidden masthead-caps text-ink-muted sm:block">
+            A Blind Benchmark in Fiction
+          </span>
+          <span className="masthead-caps text-ink-muted">
+            Vol. I &nbsp;·&nbsp; N°1 &nbsp;·&nbsp; MMXXVI
+          </span>
+        </div>
+      </div>
+
+      {/* ── Hero / wordmark ──────────────────────────────────────────── */}
+      <section className="mx-auto max-w-5xl px-6 pt-20 pb-12 text-center sm:pt-28">
+        <p className="rise-in rise-in-1 editorial-caps text-ink-muted">
+          ⁂ &nbsp; A Contest of Pens &nbsp; ⁂
         </p>
-      </header>
 
-      <PromptForm />
+        <h1
+          className="rise-in rise-in-2 mt-8 font-display italic font-normal leading-[0.88] tracking-tight text-ink"
+          style={{ fontSize: "clamp(4.5rem, 14vw, 10rem)" }}
+        >
+          Story
+          <br />
+          Arena
+        </h1>
 
-      <p className="mt-12 text-center text-xs text-muted-foreground">
-        Stories appear blind as A, B, and C. Vote for the best one.
-        <br />
-        We&apos;ll reveal the models after.
-      </p>
+        {/* Rule + fleuron break */}
+        <div className="rise-in rise-in-3 mx-auto mt-12 flex max-w-md items-center gap-5">
+          <span className="hairline flex-1" />
+          <span className="text-oxblood text-lg leading-none">❦</span>
+          <span className="hairline flex-1" />
+        </div>
+
+        <p className="rise-in rise-in-3 mx-auto mt-8 max-w-2xl font-serif text-lg italic leading-relaxed text-ink-muted sm:text-xl">
+          Three frontier intelligences compose the same story in secret.
+          <br className="hidden sm:inline" />
+          <span className="not-italic font-medium text-ink">
+            You choose the finest pen.
+          </span>
+        </p>
+
+        {/* Tiny editorial byline */}
+        <p className="rise-in rise-in-3 mt-6 editorial-caps text-ink-faint">
+          Filed {issueDate} &nbsp;·&nbsp; A Living Dataset
+        </p>
+      </section>
+
+      {/* ── Form ─────────────────────────────────────────────────────── */}
+      <section className="rise-in rise-in-4 mx-auto max-w-4xl px-6 pt-8 pb-24">
+        <PromptForm />
+      </section>
+
+      {/* ── Foot note ────────────────────────────────────────────────── */}
+      <section className="rise-in rise-in-5 mx-auto max-w-2xl px-6 pb-20 text-center">
+        <div className="mx-auto mb-5 flex items-center justify-center gap-4">
+          <span className="hairline w-12" />
+          <span className="text-oxblood text-xs leading-none">⁂</span>
+          <span className="hairline w-12" />
+        </div>
+        <p className="editorial-caps text-ink-muted">
+          Stories appear blind as A &nbsp;·&nbsp; B &nbsp;·&nbsp; C
+        </p>
+        <p className="mt-2 font-serif text-sm italic text-ink-muted">
+          Pick the finest. We reveal the authors after.
+        </p>
+      </section>
     </div>
   );
 }

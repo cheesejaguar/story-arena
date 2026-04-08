@@ -2,15 +2,29 @@ import Link from "next/link";
 
 export function Footer() {
   return (
-    <footer className="mt-24 border-t border-border/40 py-8 text-sm text-muted-foreground">
-      <div className="mx-auto flex max-w-3xl items-center justify-between px-6">
-        <span className="font-serif text-base">Story Arena</span>
-        <nav className="flex gap-6">
-          <Link href="/about" className="hover:text-foreground transition-colors">
-            About
+    <footer className="mt-24 border-t border-rule/60 py-10">
+      <div className="mx-auto flex max-w-6xl flex-col items-center gap-4 px-6 sm:flex-row sm:justify-between">
+        <div className="flex items-center gap-3">
+          <span className="text-oxblood text-sm leading-none">❦</span>
+          <span className="font-display text-lg italic text-ink">Story Arena</span>
+          <span className="hidden text-ink-faint sm:inline">·</span>
+          <span className="hidden masthead-caps text-ink-faint sm:inline">
+            Published on the open web
+          </span>
+        </div>
+        <nav className="flex items-center gap-6">
+          <Link
+            href="/about"
+            className="editorial-caps text-ink-muted transition-colors hover:text-oxblood"
+          >
+            Colophon
           </Link>
-          <Link href="/results" className="hover:text-foreground transition-colors">
-            Results
+          <span className="text-ink-faint">·</span>
+          <Link
+            href="/results"
+            className="editorial-caps text-ink-muted transition-colors hover:text-oxblood"
+          >
+            Standings
           </Link>
         </nav>
       </div>
