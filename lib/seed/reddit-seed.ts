@@ -71,6 +71,14 @@ export function getHomepageArchivePrompts(dataset: RedditSeedRun[], limit = 6) {
     }));
 }
 
+export function getSeedLookupKey(promptText: string) {
+  const normalizedPrompt = promptText.trim();
+  return {
+    sessionId: REDDIT_SEED_SESSION_ID,
+    promptHash: hashPrompt(normalizedPrompt),
+  };
+}
+
 export function buildRunInsert(run: RedditSeedRun) {
   const normalizedPrompt = run.promptText.trim();
   return {

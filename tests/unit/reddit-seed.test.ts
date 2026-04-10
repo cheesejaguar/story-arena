@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { LengthBucket } from "@/lib/utils/length";
+import { REDDIT_SEEDED_RUNS } from "@/data/reddit-seeded-runs";
 import {
   REDDIT_SEED_COMPLETED_AT,
   REDDIT_SEED_SESSION_ID,
@@ -7,10 +7,12 @@ import {
   buildStoryOutputInserts,
   buildRunInsert,
   getHomepageArchivePrompts,
+  getSeedLookupKey,
   validateRedditSeedDataset,
   type RedditSeedRun,
 } from "@/lib/seed/reddit-seed";
-import { REDDIT_SEEDED_RUNS } from "@/data/reddit-seeded-runs";
+import { hashPrompt } from "@/lib/utils/hash";
+import type { LengthBucket } from "@/lib/utils/length";
 
 const fixture: RedditSeedRun[] = [
   {
@@ -92,5 +94,14 @@ describe("REDDIT_SEEDED_RUNS", () => {
     expect(dataset.filter((run) => run.featured)).toHaveLength(6);
     expect(new Set(dataset.map((run) => run.redditId)).size).toBe(25);
     expect(dataset.every((run) => run.stories.length === 3)).toBe(true);
+  });
+});
+
+describe("getSeedLookupKey", () => {
+  it("uses the fixed seed session id plus the normalized prompt hash", () => {
+    expect(getSeedLookupKey("  The moon sends one voicemail to Earth every century.  ")).toEqual({
+      sessionId: REDDIT_SEED_SESSION_ID,
+      promptHash: hashPrompt("The moon sends one voicemail to Earth every century."),
+    });
   });
 });
