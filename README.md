@@ -185,7 +185,12 @@ vercel env pull .env.local
 
 # 6. Run the database migration
 pnpm tsx --env-file .env.local lib/db/migrate.ts
+
+# 7. Seed the curated Reddit starter archive (optional locally, required for a fresh deployment that should have immediate judge content)
+pnpm db:seed:reddit
 ```
+
+The deployed site can ship with a starter pool of 25 completed runs derived from r/WritingPrompts. They are committed in-repo and inserted with `pnpm db:seed:reddit`; `/judge` and voting work immediately once those rows exist.
 
 ### Develop
 
@@ -205,6 +210,7 @@ pnpm test                    # Vitest unit + integration (35 tests)
 pnpm exec tsc --noEmit       # Type-check
 pnpm lint                    # ESLint
 pnpm build                   # Next.js production build
+pnpm db:seed:reddit          # insert / verify the 25 Reddit starter runs
 MOCK_AI=1 pnpm test:e2e      # Playwright happy path
 ```
 
