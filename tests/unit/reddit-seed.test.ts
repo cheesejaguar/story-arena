@@ -10,6 +10,7 @@ import {
   validateRedditSeedDataset,
   type RedditSeedRun,
 } from "@/lib/seed/reddit-seed";
+import { REDDIT_SEEDED_RUNS } from "@/data/reddit-seeded-runs";
 
 const fixture: RedditSeedRun[] = [
   {
@@ -81,5 +82,15 @@ describe("buildRunInsert / buildStoryOutputInserts", () => {
       finishReason: "seeded",
       fallbackUsed: false,
     });
+  });
+});
+
+describe("REDDIT_SEEDED_RUNS", () => {
+  it("contains 25 unique Reddit-derived runs with 3 stories each", () => {
+    const dataset = validateRedditSeedDataset(REDDIT_SEEDED_RUNS);
+    expect(dataset).toHaveLength(25);
+    expect(dataset.filter((run) => run.featured)).toHaveLength(6);
+    expect(new Set(dataset.map((run) => run.redditId)).size).toBe(25);
+    expect(dataset.every((run) => run.stories.length === 3)).toBe(true);
   });
 });
