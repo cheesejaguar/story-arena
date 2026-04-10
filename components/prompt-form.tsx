@@ -203,14 +203,14 @@ export function PromptForm() {
         <Textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Write a fictional prompt. A scene, a what-if, a character at a turning point, a single image that demands a story…"
+          placeholder="Write a fictional prompt — or borrow one from the Reddit archive below."
           rows={5}
           maxLength={4000}
           className="resize-none rounded-none border-0 border-y border-ink/80 bg-transparent px-0 py-5 font-serif text-lg italic leading-relaxed text-ink placeholder:text-ink-faint placeholder:italic focus-visible:border-oxblood focus-visible:ring-0 focus-visible:ring-offset-0"
         />
       </div>
 
-      {/* ── Example prompts from the archive ────────────────────────── */}
+      {/* ── Curated prompts from Reddit ─────────────────────────────── */}
       <ExamplePrompts onPick={(t) => setPrompt(t)} />
 
       {/* ── Submission row ──────────────────────────────────────────── */}
