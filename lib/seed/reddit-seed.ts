@@ -9,7 +9,7 @@ export type RedditSeedStory = {
   text: string;
 };
 
-export type RedditSeedRun = {
+export type RedditPromptRecord = {
   redditId: string;
   redditPermalink: string;
   redditTitle: string;
@@ -17,6 +17,9 @@ export type RedditSeedRun = {
   promptText: string;
   featured: boolean;
   promptLengthBucket: LengthBucket;
+};
+
+export type RedditSeedRun = RedditPromptRecord & {
   stories: [RedditSeedStory, RedditSeedStory, RedditSeedStory];
 };
 
@@ -57,7 +60,7 @@ export function validateRedditSeedDataset(dataset: RedditSeedRun[]): RedditSeedR
   return dataset;
 }
 
-export function getHomepageArchivePrompts(dataset: RedditSeedRun[], limit = 6) {
+export function getHomepageArchivePrompts(dataset: RedditPromptRecord[], limit = 6) {
   return dataset
     .filter((run) => run.featured)
     .sort((a, b) => b.redditScore - a.redditScore)

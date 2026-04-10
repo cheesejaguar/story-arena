@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { REDDIT_SEEDED_RUNS } from "@/data/reddit-seeded-runs";
+import { REDDIT_WRITING_PROMPTS } from "@/data/reddit-writing-prompts";
 import {
   REDDIT_SEED_COMPLETED_AT,
   REDDIT_SEED_SESSION_ID,
@@ -103,5 +104,13 @@ describe("getSeedLookupKey", () => {
       sessionId: REDDIT_SEED_SESSION_ID,
       promptHash: hashPrompt("The moon sends one voicemail to Earth every century."),
     });
+  });
+});
+
+describe("homepage archive sizing", () => {
+  it("exposes exactly 6 featured prompts for the homepage grid", () => {
+    const prompts = getHomepageArchivePrompts(REDDIT_WRITING_PROMPTS, 6);
+    expect(prompts).toHaveLength(6);
+    expect(prompts[0]?.redditId).toBe("5uilpw");
   });
 });
