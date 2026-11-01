@@ -2,16 +2,13 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { isAdmin } from "@/lib/security/admin-auth";
 import { getRunWithOutputs } from "@/lib/db/queries";
-import { BENCHMARK_MODELS } from "@/lib/ai/models";
+import { getModelLabel, getRoster } from "@/lib/ai/models";
+import { formatUsdMicro } from "@/lib/utils/cost";
 import { Card } from "@/components/ui/card";
 import { StoryMarkdown } from "@/components/story-markdown";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-function modelLabel(slug: string): string {
-  return BENCHMARK_MODELS.find((m) => m.slug === slug)?.label ?? slug;
-}
 
 type PageProps = {
   params: Promise<{ runId: string }>;
@@ -79,7 +76,21 @@ export default async function AdminRunDetailPage({ params }: PageProps) {
           <span className="border border-rule px-2 py-1">
             prompt v{data.run.systemPromptVersion}
           </span>
+          <span className="border border-rule px-2 py-1">
+            {getRoster(data.run.rosterId).label}
+          </span>
+          <span className="border border-rule px-2 py-1">
+            {data.run.isReplay ? "replay" : "generated"}
+          </span>
+          <span className="border border-rule px-2 py-1">
+            {formatUsdMicro(data.run.totalCostMicroUsd)}
+          </span>
         </div>
+        {data.run.failureReason && (
+          <p className="mt-4 font-mono text-[11px] text-oxblood">
+            {data.run.failureReason}
+          </p>
+        )}
       </section>
 
       <section>
@@ -103,7 +114,7 @@ export default async function AdminRunDetailPage({ params }: PageProps) {
                   </span>
                 </header>
                 <p className="font-display text-base italic text-ink">
-                  {modelLabel(o.modelSlug)}
+                  {getModelLabel(o.modelSlug)}
                 </p>
                 <p className="mt-1 font-mono text-[9px] text-ink-faint">
                   {o.modelSlug}
@@ -116,7 +127,8 @@ export default async function AdminRunDetailPage({ params }: PageProps) {
                 <p className="mt-4 border-t border-rule/40 pt-3 font-mono text-[9px] tabular-nums text-ink-faint">
                   {o.latencyMs}ms &nbsp;·&nbsp; {o.tokenInput ?? "?"} in /{" "}
                   {o.tokenOutput ?? "?"} out &nbsp;·&nbsp;{" "}
-                  {o.finishReason ?? "?"}
+                  {o.finishReason ?? "?"} &nbsp;·&nbsp;{" "}
+                  {formatUsdMicro(o.costMicroUsd)}
                 </p>
               </Card>
             ))}

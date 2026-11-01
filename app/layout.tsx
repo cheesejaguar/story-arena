@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Cormorant_Garamond, Fraunces, IBM_Plex_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import "./globals.css";
@@ -8,7 +8,7 @@ import { Footer } from "@/components/footer";
 // Display: Cormorant Garamond — refined high-contrast serif with elegant italics.
 // The wordmark uses this.
 const cormorant = Cormorant_Garamond({
-  variable: "--font-display",
+  variable: "--font-cormorant",
   subsets: ["latin"],
   weight: ["300", "400", "500", "600"],
   style: ["normal", "italic"],
@@ -18,7 +18,7 @@ const cormorant = Cormorant_Garamond({
 // Body: Fraunces — variable serif that holds its own next to Cormorant.
 // Used for running text and the story-prose utility.
 const fraunces = Fraunces({
-  variable: "--font-serif",
+  variable: "--font-fraunces",
   subsets: ["latin"],
   display: "swap",
 });
@@ -26,7 +26,7 @@ const fraunces = Fraunces({
 // Labels / metadata: IBM Plex Mono — precise grotesque monospace.
 // Used for masthead chrome, small-caps-style labels, volume numbers.
 const plexMono = IBM_Plex_Mono({
-  variable: "--font-mono",
+  variable: "--font-plex",
   subsets: ["latin"],
   weight: ["400", "500"],
   display: "swap",
@@ -38,6 +38,12 @@ export const metadata: Metadata = {
     "A blind contest of fiction between frontier language models. Read the work, pick the finest pen, turn each judgment into a benchmark label.",
 };
 
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+  themeColor: "#f4eee1",
+};
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -46,7 +52,7 @@ export default function RootLayout({
   return (
     <html lang="en" className="h-full antialiased">
       <body
-        className={`${cormorant.variable} ${fraunces.variable} ${plexMono.variable} min-h-full flex flex-col paper-grain`}
+        className={`${cormorant.variable} ${fraunces.variable} ${plexMono.variable} min-h-full flex flex-col`}
       >
         <main className="flex-1">{children}</main>
         <Footer />

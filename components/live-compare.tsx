@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { CompareGrid } from "./compare-grid";
 import { VotePanel, type Reveal } from "./vote-panel";
@@ -41,6 +41,10 @@ export const INITIAL_LIVE_STATE: LiveState = {
 export function LiveCompare({ state }: { state: LiveState }) {
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [reveal, setReveal] = useState<Reveal | null>(null);
+  const [viewed, setViewed] = useState<Set<Slot>>(new Set());
+  const [scrollDepths, setScrollDepths] = useState<
+    Partial<Record<Slot, number>>
+  >({});
   const [startTime] = useState(() => Date.now());
 
   // Auto-scroll the viewport to the cards on first render so the user
@@ -50,15 +54,34 @@ export function LiveCompare({ state }: { state: LiveState }) {
   }, []);
 
   const stories = useMemo(
-    () => (["A", "B", "C"] as Slot[]).map((slot) => ({
-      slot,
-      text: state.texts[slot] ?? "",
-    })),
+    () =>
+      (["A", "B", "C"] as Slot[]).map((slot) => ({
+        slot,
+        text: state.texts[slot] ?? "",
+      })),
     [state.texts],
   );
 
+  const handleViewed = useCallback((slot: Slot) => {
+    setViewed((prev) => {
+      if (prev.has(slot)) return prev;
+      const next = new Set(prev);
+      next.add(slot);
+      return next;
+    });
+  }, []);
+
+  const handleScrollDepth = useCallback((slot: Slot, depth: number) => {
+    setScrollDepths((prev) => {
+      const current = prev[slot] ?? 0;
+      if (depth <= current) return prev;
+      return { ...prev, [slot]: depth };
+    });
+  }, []);
+
   const canVote = state.ready && !reveal;
-  const allStoriesViewed = state.ready; // generous default: if ready, assume yes
+  const allStoriesViewed =
+    state.ready && stories.every((story) => viewed.has(story.slot));
 
   if (reveal && selectedSlot) {
     return (
@@ -88,6 +111,8 @@ export function LiveCompare({ state }: { state: LiveState }) {
         selectedSlot={selectedSlot}
         disabled={!canVote}
         onSelect={canVote ? setSelectedSlot : () => {}}
+        onViewed={handleViewed}
+        onScrollDepth={handleScrollDepth}
         renderStreaming={(slot) => !state.slotsDone.has(slot)}
       />
 
@@ -97,7 +122,7 @@ export function LiveCompare({ state }: { state: LiveState }) {
           selectedSlot={selectedSlot}
           allStoriesViewed={allStoriesViewed}
           startTime={startTime}
-          scrollDepths={{}}
+          scrollDepths={scrollDepths}
           onVoted={setReveal}
         />
       ) : state.error ? (

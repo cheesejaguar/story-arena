@@ -4,15 +4,11 @@ import Link from "next/link";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import { BENCHMARK_MODELS } from "@/lib/ai/models";
+import { getModelLabel } from "@/lib/ai/models";
 import type { Slot } from "@/lib/utils/randomize-slots";
 import type { Reveal } from "./vote-panel";
 
 const SLOTS: Slot[] = ["A", "B", "C"];
-
-function modelLabel(slug: string): string {
-  return BENCHMARK_MODELS.find((m) => m.slug === slug)?.label ?? slug;
-}
 
 /**
  * Post-vote reveal — unblind the three stories and highlight the user's pick.
@@ -53,7 +49,7 @@ export function RevealPanel({
       <h2 className="mt-3 font-display text-4xl italic font-normal leading-tight text-ink">
         You picked{" "}
         <span className="not-italic font-medium text-oxblood">
-          {modelLabel(reveal[chosenSlot])}
+          {getModelLabel(reveal[chosenSlot])}
         </span>
       </h2>
       {subtitle ? (
@@ -77,7 +73,7 @@ export function RevealPanel({
             >
               <p className="editorial-caps text-ink-muted">Story {slot}</p>
               <p className="mt-3 font-display text-xl italic font-normal leading-tight text-ink">
-                {modelLabel(reveal[slot])}
+                {getModelLabel(reveal[slot])}
               </p>
               <p className="mt-1 font-mono text-[10px] text-ink-faint tabular-nums">
                 {reveal[slot]}

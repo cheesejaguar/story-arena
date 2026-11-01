@@ -1,4 +1,8 @@
-import { BENCHMARK_MODELS, type BenchmarkModel } from "./models";
+import {
+  ACTIVE_ROSTER,
+  type BenchmarkModel,
+  type ModelRoster,
+} from "./models";
 import { generateStoryStream, type StoryMeta } from "./generate-story";
 import { randomizeSlots, type Slot } from "@/lib/utils/randomize-slots";
 import { AsyncQueue } from "@/lib/utils/async-queue";
@@ -8,6 +12,11 @@ export type BenchmarkInput = {
   prompt: string;
   length: LengthBucket;
   systemPromptVersion: string;
+  /** Roster for this run. Defaults to the active season. */
+  roster?: ModelRoster;
+  /** Cancels every in-flight provider request. */
+  signal?: AbortSignal;
+  timeoutMs?: number;
 };
 
 /**
@@ -28,6 +37,8 @@ export type BenchmarkStreamResult = {
   completed: Partial<Record<Slot, StoryMeta>>;
   /** Failed slots. */
   failed: { slot: Slot; modelSlug: string; error: string }[];
+  /** True when the caller aborted the run. */
+  aborted: boolean;
 };
 
 /**
@@ -48,8 +59,10 @@ export type BenchmarkStreamResult = {
 export async function* streamBenchmarkRun(
   input: BenchmarkInput,
 ): AsyncGenerator<BenchmarkStreamEvent, BenchmarkStreamResult, void> {
+  const roster = input.roster ?? ACTIVE_ROSTER;
+
   // Shuffle models into slots A, B, C using the crypto-grade randomizer.
-  const slotted = randomizeSlots([...BENCHMARK_MODELS]);
+  const slotted = randomizeSlots([...roster.models]);
   const slotAssignment = Object.fromEntries(
     slotted.map(({ slot, value }) => [slot, value.slug]),
   ) as Record<Slot, string>;
@@ -69,7 +82,10 @@ export async function* streamBenchmarkRun(
           modelSlug: model.slug,
           length: input.length,
           systemPromptVersion: input.systemPromptVersion,
+          signal: input.signal,
+          timeoutMs: input.timeoutMs,
         })) {
+          if (input.signal?.aborted) break;
           if (evt.type === "delta") {
             queue.push({ type: "slot_delta", slot, text: evt.text });
           } else {
@@ -78,13 +94,15 @@ export async function* streamBenchmarkRun(
           }
         }
       } catch (err) {
-        const entry = {
-          slot,
-          modelSlug: model.slug,
-          error: err instanceof Error ? err.message : String(err),
-        };
-        failed.push(entry);
-        queue.push({ type: "slot_error", ...entry });
+        if (!input.signal?.aborted) {
+          const entry = {
+            slot,
+            modelSlug: model.slug,
+            error: err instanceof Error ? err.message : String(err),
+          };
+          failed.push(entry);
+          queue.push({ type: "slot_error", ...entry });
+        }
       } finally {
         runningCount--;
         if (runningCount === 0) {
@@ -99,5 +117,10 @@ export async function* streamBenchmarkRun(
     yield evt;
   }
 
-  return { slotAssignment, completed, failed };
+  return {
+    slotAssignment,
+    completed,
+    failed,
+    aborted: Boolean(input.signal?.aborted),
+  };
 }

@@ -1,9 +1,10 @@
 import {
-  getAggregateModelStats,
-  getSlotDistribution,
-  getWinsByLength,
-} from "@/lib/db/queries";
-import { BENCHMARK_MODELS } from "@/lib/ai/models";
+  getCachedAggregateModelStats,
+  getCachedSeasonSummaries,
+  getCachedSlotDistribution,
+  getCachedWinsByLength,
+} from "@/lib/db/cached-stats";
+import { ACTIVE_ROSTER, getRoster } from "@/lib/ai/models";
 import { wilsonInterval } from "@/lib/utils/stats";
 import type { LengthBucket } from "@/lib/utils/length";
 
@@ -22,16 +23,17 @@ function pct(n: number): string {
 }
 
 export default async function ResultsPage() {
-  const [aggregate, slotDist, winsByLength] = await Promise.all([
-    getAggregateModelStats(),
-    getSlotDistribution(),
-    getWinsByLength(),
+  const [aggregate, slotDist, winsByLength, seasons] = await Promise.all([
+    getCachedAggregateModelStats(ACTIVE_ROSTER.id),
+    getCachedSlotDistribution(ACTIVE_ROSTER.id),
+    getCachedWinsByLength(ACTIVE_ROSTER.id),
+    getCachedSeasonSummaries(),
   ]);
 
   const totalVotes = aggregate.reduce((s, r) => s + r.wins, 0);
 
   // Overall leaderboard with Wilson CIs
-  const overall = BENCHMARK_MODELS.map((m) => {
+  const overall = ACTIVE_ROSTER.models.map((m) => {
     const wins = aggregate.find((r) => r.modelSlug === m.slug)?.wins ?? 0;
     const ci = wilsonInterval(wins, totalVotes);
     return { slug: m.slug, label: m.label, wins, ...ci };
@@ -55,7 +57,7 @@ export default async function ResultsPage() {
   const totalsByLength = new Map<LengthBucket, number>();
   for (const len of LENGTHS) {
     let t = 0;
-    for (const m of BENCHMARK_MODELS) {
+    for (const m of ACTIVE_ROSTER.models) {
       t += lengthIndex.get(`${len}::${m.slug}`) ?? 0;
     }
     totalsByLength.set(len, t);
@@ -65,7 +67,9 @@ export default async function ResultsPage() {
     <div className="mx-auto max-w-4xl px-6 pt-16 pb-20">
       {/* ── Masthead ─────────────────────────────────────────────── */}
       <header className="mx-auto mb-14 max-w-2xl text-center">
-        <p className="editorial-caps text-ink-muted">⁂ &nbsp; Standings &nbsp; ⁂</p>
+        <p className="editorial-caps text-ink-muted">
+          ⁂ &nbsp; Standings &nbsp;·&nbsp; {ACTIVE_ROSTER.label} &nbsp; ⁂
+        </p>
         <h1
           className="mt-6 font-display italic font-normal leading-[0.9] tracking-tight text-ink"
           style={{ fontSize: "clamp(3rem, 8vw, 5rem)" }}
@@ -190,7 +194,7 @@ export default async function ResultsPage() {
                   </p>
                 </div>
                 <div className="space-y-3">
-                  {BENCHMARK_MODELS.map((m) => {
+                  {ACTIVE_ROSTER.models.map((m) => {
                     const wins = lengthIndex.get(`${len}::${m.slug}`) ?? 0;
                     const share = lenTotal === 0 ? 0 : wins / lenTotal;
                     return (
@@ -272,6 +276,51 @@ export default async function ResultsPage() {
             </div>
           ))}
         </div>
+      </section>
+
+      {/* ── Season archive ───────────────────────────────────────── */}
+      <section className="mb-16">
+        <div className="mb-6 flex items-center gap-4">
+          <span className="editorial-caps text-ink-muted">
+            <span className="text-oxblood">§</span>&nbsp;&nbsp;Seasons
+          </span>
+          <span className="hairline flex-1" />
+        </div>
+        <p className="mb-4 font-serif text-sm italic text-ink-muted">
+          A season freezes the three-model roster. Older runs keep their
+          original contestants, so the archive never rewrites history.
+        </p>
+        <ul className="divide-y divide-rule/40 border-y border-rule">
+          {seasons.map((season) => {
+            const roster = getRoster(season.rosterId);
+            const active = season.rosterId === ACTIVE_ROSTER.id;
+            return (
+              <li
+                key={season.rosterId}
+                className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1 py-3"
+              >
+                <div className="flex items-baseline gap-3">
+                  <span className="font-display text-lg italic text-ink">
+                    {roster.label}
+                  </span>
+                  <span className="font-mono text-[10px] text-ink-faint">
+                    {season.rosterId}
+                  </span>
+                  {active && (
+                    <span className="editorial-caps text-oxblood">current</span>
+                  )}
+                </div>
+                <span className="font-mono text-[11px] tabular-nums text-ink-muted">
+                  {season.runs.toLocaleString()} runs ·{" "}
+                  {season.votes.toLocaleString()} votes
+                  {season.lastRunAt
+                    ? ` · last ${new Date(season.lastRunAt).toLocaleDateString()}`
+                    : ""}
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       </section>
 
       {/* ── Foot rule ────────────────────────────────────────────── */}

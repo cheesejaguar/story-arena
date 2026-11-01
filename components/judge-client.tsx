@@ -47,40 +47,59 @@ export function JudgeClient() {
   const [startTime, setStartTime] = useState(() => Date.now());
   const [nextLoading, setNextLoading] = useState(false);
 
-  const fetchNext = useCallback(async () => {
-    setNextLoading(true);
+  const applyNext = useCallback((data: JudgeResponse | null) => {
+    if (!data) {
+      setPhase({ kind: "error", message: "Couldn't fetch a story. Try again." });
+      return;
+    }
+    if (!data.run) {
+      setPhase({ kind: "empty", votedByYou: data.stats.votedByYou });
+      return;
+    }
+    setPhase({
+      kind: "judging",
+      run: data.run,
+      votedByYou: data.stats.votedByYou,
+      remaining: data.stats.remaining,
+    });
+    setSelectedSlot(null);
+    setViewed(new Set());
+    setScrollDepths({});
+    setStartTime(Date.now());
+    // Scroll to top for the next story
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  }, []);
+
+  const loadNext = useCallback(async (): Promise<JudgeResponse | null> => {
     try {
       const res = await fetch("/api/judge/next", { cache: "no-store" });
-      if (!res.ok) {
-        setPhase({ kind: "error", message: "Couldn't fetch a story. Try again." });
-        return;
-      }
-      const data = (await res.json()) as JudgeResponse;
-      if (!data.run) {
-        setPhase({ kind: "empty", votedByYou: data.stats.votedByYou });
-        return;
-      }
-      setPhase({
-        kind: "judging",
-        run: data.run,
-        votedByYou: data.stats.votedByYou,
-        remaining: data.stats.remaining,
-      });
-      setSelectedSlot(null);
-      setViewed(new Set());
-      setScrollDepths({});
-      setStartTime(Date.now());
-      // Scroll to top for the next story
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      if (!res.ok) return null;
+      return (await res.json()) as JudgeResponse;
     } catch {
-      setPhase({ kind: "error", message: "Network error." });
-    } finally {
-      setNextLoading(false);
+      return null;
     }
   }, []);
 
+  const fetchNext = useCallback(async () => {
+    const data = await loadNext();
+    applyNext(data);
+    setNextLoading(false);
+  }, [loadNext, applyNext]);
+
   useEffect(() => {
-    fetchNext();
+    let cancelled = false;
+    void loadNext().then((data) => {
+      if (cancelled) return;
+      applyNext(data);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [loadNext, applyNext]);
+
+  const handleNext = useCallback(() => {
+    setNextLoading(true);
+    void fetchNext();
   }, [fetchNext]);
 
   const handleViewed = useCallback((slot: Slot) => {
@@ -136,7 +155,7 @@ export function JudgeClient() {
         <p className="font-display text-2xl italic text-ink">{phase.message}</p>
         <button
           type="button"
-          onClick={fetchNext}
+          onClick={handleNext}
           className="mt-6 editorial-caps text-oxblood underline underline-offset-4 hover:text-oxblood-deep"
         >
           Try again
@@ -207,13 +226,14 @@ export function JudgeClient() {
           subtitle={`${phase.votedByYou.toLocaleString()} judged — ${phase.remaining.toLocaleString()} still waiting for you`}
           primaryAction={{
             label: "Next story",
-            onClick: fetchNext,
+            onClick: handleNext,
             loading: nextLoading,
           }}
         />
       ) : (
         <>
           <CompareGrid
+            key={run.id}
             stories={run.stories}
             selectedSlot={selectedSlot}
             onSelect={setSelectedSlot}

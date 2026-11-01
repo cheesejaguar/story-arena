@@ -19,6 +19,7 @@ function makeStream(modelSlug: string, throwAt?: "start" | "mid") {
       tokenInput: 10,
       tokenOutput: 50,
       finishReason: "stop",
+      costMicroUsd: 0,
     };
     yield { type: "done", meta };
   };
@@ -30,6 +31,7 @@ vi.mock("@/lib/ai/generate-story", () => ({
 }));
 
 import { streamBenchmarkRun } from "@/lib/ai/benchmark-run";
+import { ACTIVE_ROSTER } from "@/lib/ai/models";
 import type {
   BenchmarkStreamEvent,
   BenchmarkStreamResult,
@@ -87,11 +89,7 @@ describe("streamBenchmarkRun", () => {
     // Slot assignment maps back to all 3 model slugs
     expect(
       Object.values(summary.slotAssignment).sort(),
-    ).toEqual([
-      "anthropic/claude-opus-4.6",
-      "google/gemini-3.1-pro-preview",
-      "openai/gpt-5.4",
-    ]);
+    ).toEqual(ACTIVE_ROSTER.models.map((m) => m.slug).sort());
 
     // Each completed slot's modelSlug matches its slotAssignment entry
     for (const slot of ["A", "B", "C"] as const) {

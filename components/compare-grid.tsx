@@ -1,12 +1,7 @@
 "use client";
 
-import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@/components/ui/tabs";
-import { StoryCard, type StoryCardProps } from "./story-card";
+import { useEffect, useRef } from "react";
+import { StoryCard } from "./story-card";
 import type { Slot } from "@/lib/utils/randomize-slots";
 
 export type CompareStory = {
@@ -25,6 +20,12 @@ export type CompareGridProps = {
   renderStreaming?: (slot: Slot) => boolean;
 };
 
+/**
+ * One responsive grid for every breakpoint. On phones the cards stack; on
+ * desktop they sit side by side. A single IntersectionObserver and a single
+ * passive scroll listener cover all three cards, instead of mounting six
+ * observers (desktop + mobile trees) and three scroll listeners.
+ */
 export function CompareGrid({
   stories,
   selectedSlot,
@@ -34,48 +35,97 @@ export function CompareGrid({
   onScrollDepth,
   renderStreaming,
 }: CompareGridProps) {
-  const cardProps = (s: CompareStory): StoryCardProps => ({
-    slot: s.slot,
-    text: s.text,
-    selected: selectedSlot === s.slot,
-    disabled,
-    streaming: renderStreaming ? renderStreaming(s.slot) : false,
-    onSelect: () => onSelect(s.slot),
-    onViewed: onViewed ? () => onViewed(s.slot) : undefined,
-    onScrollDepth: onScrollDepth ? (d) => onScrollDepth(s.slot, d) : undefined,
-  });
+  const gridRef = useRef<HTMLDivElement>(null);
+  const maxDepth = useRef<Partial<Record<Slot, number>>>({});
+  const viewedRef = useRef(onViewed);
+  const scrollRef = useRef(onScrollDepth);
+  const slotKey = stories.map((story) => story.slot).join("");
+
+  useEffect(() => {
+    viewedRef.current = onViewed;
+    scrollRef.current = onScrollDepth;
+  }, [onViewed, onScrollDepth]);
+
+  useEffect(() => {
+    if (!viewedRef.current) return;
+    const root = gridRef.current;
+    if (!root) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting || entry.intersectionRatio <= 0.25) continue;
+          const slot = (entry.target as HTMLElement).dataset.slot as Slot | undefined;
+          if (!slot) continue;
+          viewedRef.current?.(slot);
+          observer.unobserve(entry.target);
+        }
+      },
+      { threshold: [0, 0.25, 0.5, 1] },
+    );
+
+    for (const el of root.querySelectorAll<HTMLElement>("[data-slot]")) {
+      observer.observe(el);
+    }
+    return () => observer.disconnect();
+  }, [slotKey]);
+
+  useEffect(() => {
+    if (!scrollRef.current) return;
+    const root = gridRef.current;
+    if (!root) return;
+
+    let frame = 0;
+
+    const measure = () => {
+      frame = 0;
+      const viewportHeight = window.innerHeight;
+      for (const el of root.querySelectorAll<HTMLElement>("[data-slot]")) {
+        const slot = el.dataset.slot as Slot | undefined;
+        if (!slot) continue;
+        const rect = el.getBoundingClientRect();
+        const total = el.scrollHeight || rect.height;
+        if (total === 0) continue;
+        const visible =
+          Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0);
+        const depth = Math.round(
+          Math.max(0, Math.min(1, visible / total)) * 100,
+        );
+        if (depth > (maxDepth.current[slot] ?? 0)) {
+          maxDepth.current[slot] = depth;
+          scrollRef.current?.(slot, depth);
+        }
+      }
+    };
+
+    const onScroll = () => {
+      if (frame) return;
+      frame = requestAnimationFrame(measure);
+    };
+
+    measure();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("resize", onScroll, { passive: true });
+    return () => {
+      if (frame) cancelAnimationFrame(frame);
+      window.removeEventListener("scroll", onScroll);
+      window.removeEventListener("resize", onScroll);
+    };
+  }, [slotKey]);
 
   return (
-    <>
-      {/* Desktop: side-by-side */}
-      <div className="hidden gap-6 lg:grid lg:grid-cols-3">
-        {stories.map((s) => (
-          <StoryCard key={s.slot} {...cardProps(s)} />
-        ))}
-      </div>
-
-      {/* Mobile: tabs */}
-      <div className="lg:hidden">
-        <Tabs defaultValue={stories[0]?.slot ?? "A"}>
-          <TabsList className="mb-4 grid w-full grid-cols-3">
-            {stories.map((s) => (
-              <TabsTrigger
-                key={s.slot}
-                value={s.slot}
-                onFocus={() => onViewed?.(s.slot)}
-              >
-                Story {s.slot}
-                {selectedSlot === s.slot && <span className="ml-1">●</span>}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-          {stories.map((s) => (
-            <TabsContent key={s.slot} value={s.slot}>
-              <StoryCard {...cardProps(s)} />
-            </TabsContent>
-          ))}
-        </Tabs>
-      </div>
-    </>
+    <div ref={gridRef} className="grid gap-6 lg:grid-cols-3">
+      {stories.map((story) => (
+        <StoryCard
+          key={story.slot}
+          slot={story.slot}
+          text={story.text}
+          selected={selectedSlot === story.slot}
+          disabled={disabled}
+          streaming={renderStreaming ? renderStreaming(story.slot) : false}
+          onSelect={() => onSelect(story.slot)}
+        />
+      ))}
+    </div>
   );
 }

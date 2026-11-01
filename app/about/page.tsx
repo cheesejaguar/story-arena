@@ -1,6 +1,10 @@
-import { BENCHMARK_MODELS } from "@/lib/ai/models";
+import { ACTIVE_ROSTER, MODEL_ROSTERS } from "@/lib/ai/models";
 
 export const runtime = "nodejs";
+
+function usd(n: number): string {
+  return `$${n.toFixed(n < 1 ? 2 : 0)}`;
+}
 
 export default function AboutPage() {
   return (
@@ -68,7 +72,7 @@ export default function AboutPage() {
           </p>
           <p className="mt-4">The models in this round:</p>
           <ul className="mt-4 list-none space-y-2 pl-0">
-            {BENCHMARK_MODELS.map((m, i) => {
+            {ACTIVE_ROSTER.models.map((m, i) => {
               const numeral = ["I", "II", "III"][i] ?? `${i + 1}`;
               return (
                 <li
@@ -81,13 +85,27 @@ export default function AboutPage() {
                   <span className="font-serif text-base text-ink">
                     {m.label}
                   </span>
-                  <span className="ml-auto font-mono text-[10px] text-ink-faint">
-                    {m.slug}
+                  <span className="ml-auto text-right font-mono text-[10px] text-ink-faint">
+                    <span className="block">{m.slug}</span>
+                    <span className="block">
+                      {usd(m.pricing.inputPerMillionUsd)} in /{" "}
+                      {usd(m.pricing.outputPerMillionUsd)} out per 1M tokens
+                    </span>
                   </span>
                 </li>
               );
             })}
           </ul>
+          <p className="mt-5 font-serif text-sm italic text-ink-muted">
+            This is {ACTIVE_ROSTER.label}. Rosters are frozen per season: when
+            the lineup rotates, older runs keep the contestants that actually
+            wrote them. Past seasons on file:{" "}
+            {Object.values(MODEL_ROSTERS)
+              .filter((roster) => roster.id !== ACTIVE_ROSTER.id)
+              .map((roster) => roster.label)
+              .join(", ") || "none yet"}
+            .
+          </p>
         </section>
 
         <div className="mx-auto flex max-w-xs items-center gap-4">

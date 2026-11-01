@@ -1,8 +1,8 @@
-import type { ModelSlug } from "@/lib/ai/models";
+import type { LegacyModelSlug } from "@/lib/ai/models";
 import type { RedditSeedRun, RedditSeedStory } from "@/lib/seed/reddit-seed";
 import { REDDIT_WRITING_PROMPTS } from "@/data/reddit-writing-prompts";
 
-const SLOT_PERMUTATIONS: Array<Record<"A" | "B" | "C", ModelSlug>> = [
+const SLOT_PERMUTATIONS: Array<Record<"A" | "B" | "C", LegacyModelSlug>> = [
   {
     A: "openai/gpt-5.4",
     B: "anthropic/claude-opus-4.6",
@@ -37,7 +37,7 @@ const SLOT_PERMUTATIONS: Array<Record<"A" | "B" | "C", ModelSlug>> = [
 
 type SeedStorySet = {
   permutation: number;
-  textByModel: Record<ModelSlug, string>;
+  textByModel: Record<LegacyModelSlug, string>;
 };
 
 function makeStories(seed: SeedStorySet): [RedditSeedStory, RedditSeedStory, RedditSeedStory] {

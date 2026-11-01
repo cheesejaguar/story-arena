@@ -23,8 +23,17 @@ vi.mock("@/lib/security/session", () => ({
 }));
 
 vi.mock("@/lib/security/rate-limit", () => ({
-  voteLimiter: { limit: async () => ({ success: true }) },
+  voteLimiter: { limit: vi.fn(async () => ({ success: true })) },
+  ipVoteLimiter: { limit: vi.fn(async () => ({ success: true })) },
+  checkLimit: vi.fn(
+    async (limiter: { limit: (key: string) => Promise<{ success: boolean }> }) => {
+      const result = await limiter.limit("test");
+      return { success: result.success };
+    },
+  ),
 }));
+
+vi.mock("next/cache", () => ({ revalidateTag: vi.fn() }));
 
 import { POST } from "@/app/api/votes/route";
 
