@@ -18,11 +18,24 @@ const EnvSchema = z.object({
   // Gateway is enabled on the project; refreshed locally via `vercel env pull`.
   // Optional so non-AI routes (e.g. /results, /admin, /about) can boot even
   // when AI Gateway is not yet provisioned. The AI SDK reads it directly from
-  // process.env at call time and will throw a 502 if missing.
-  VERCEL_OIDC_TOKEN: trimmed.min(1).optional(),
+  // process.env at call time and will throw a 502 if missing. An empty value
+  // in .env.local is treated the same as unset.
+  VERCEL_OIDC_TOKEN: trimmed
+    .optional()
+    .transform((value) => (value ? value : undefined)),
   ADMIN_SECRET: trimmed.min(32),
   SESSION_COOKIE_SECRET: trimmed.min(32),
   SYSTEM_PROMPT_VERSION: trimmed.default("v1"),
+
+  // ── Cost + capacity controls ─────────────────────────────────────────
+  // Hard daily ceiling on AI spend, in USD. A run is only started if its
+  // conservative estimate fits under the remaining budget.
+  DAILY_SPEND_CAP_USD: z.coerce.number().positive().default(25),
+  // Maximum number of concurrent three-model generations across the whole
+  // deployment. Protects both provider rate limits and the function pool.
+  GLOBAL_MAX_CONCURRENT_RUNS: z.coerce.number().int().positive().default(6),
+  // Per-model wall-clock timeout for a single story generation.
+  GENERATION_TIMEOUT_MS: z.coerce.number().int().positive().default(150_000),
 });
 
 const parsed = EnvSchema.safeParse(process.env);

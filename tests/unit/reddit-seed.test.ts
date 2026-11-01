@@ -13,6 +13,7 @@ import {
   type RedditSeedRun,
 } from "@/lib/seed/reddit-seed";
 import { hashPrompt } from "@/lib/utils/hash";
+import { LEGACY_ROSTER_ID } from "@/lib/ai/models";
 import type { LengthBucket } from "@/lib/utils/length";
 
 const fixture: RedditSeedRun[] = [
@@ -69,9 +70,14 @@ describe("buildRunInsert / buildStoryOutputInserts", () => {
     const runInsert = buildRunInsert(fixture[0]);
     expect(runInsert.sessionId).toBe(REDDIT_SEED_SESSION_ID);
     expect(runInsert.systemPromptVersion).toBe(REDDIT_SEED_SYSTEM_PROMPT_VERSION);
+    expect(runInsert.createdAt).toEqual(REDDIT_SEED_COMPLETED_AT);
     expect(runInsert.completedAt).toEqual(REDDIT_SEED_COMPLETED_AT);
     expect(runInsert.status).toBe("complete");
     expect(runInsert.moderationStatus).toBe("allowed");
+    expect(runInsert.rosterId).toBe(LEGACY_ROSTER_ID);
+    expect(runInsert.isReplay).toBe(false);
+    expect(runInsert.totalCostMicroUsd).toBe(0);
+    expect(runInsert.dedupeKey).toMatch(/^[0-9a-f]{64}$/);
 
     const outputs = buildStoryOutputInserts("run-1", fixture[0]);
     expect(outputs).toHaveLength(3);
@@ -84,6 +90,7 @@ describe("buildRunInsert / buildStoryOutputInserts", () => {
       generationStatus: "success",
       finishReason: "seeded",
       fallbackUsed: false,
+      costMicroUsd: 0,
     });
   });
 });

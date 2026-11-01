@@ -9,13 +9,13 @@ export default defineConfig({
   retries: process.env.CI ? 2 : 0,
   webServer: {
     command: process.env.CI
-      ? `pnpm build && pnpm start --port ${PORT}`
-      : `pnpm dev --port ${PORT}`,
+      ? `corepack pnpm build && corepack pnpm start --port ${PORT}`
+      : `corepack pnpm dev --port ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
     env: {
-      MOCK_AI: process.env.MOCK_AI ?? "0",
+      MOCK_AI: process.env.MOCK_AI ?? "1",
       PORT,
     },
   },

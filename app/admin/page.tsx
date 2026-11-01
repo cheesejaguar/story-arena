@@ -1,12 +1,16 @@
 import Link from "next/link";
 import { isAdmin } from "@/lib/security/admin-auth";
+import { listRecentRuns } from "@/lib/db/queries";
 import {
-  getAggregateModelStats,
-  getSlotDistribution,
-  getWinsByLength,
-  listRecentRuns,
-} from "@/lib/db/queries";
-import { BENCHMARK_MODELS } from "@/lib/ai/models";
+  getCachedAggregateModelStats,
+  getCachedCostSummary,
+  getCachedSeasonSummaries,
+  getCachedSlotDistribution,
+  getCachedWinsByLength,
+} from "@/lib/db/cached-stats";
+import { ACTIVE_ROSTER, getRoster } from "@/lib/ai/models";
+import { dailySpendCapMicroUsd, getTodaySpendMicroUsd } from "@/lib/ai/spend-cap";
+import { formatUsdMicro } from "@/lib/utils/cost";
 import { wilsonInterval } from "@/lib/utils/stats";
 import type { LengthBucket } from "@/lib/utils/length";
 
@@ -84,18 +88,23 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   }
 
   // ── Authed: dashboard ────────────────────────────────────────────
-  const [aggregate, slotDist, winsByLength, runs] = await Promise.all([
-    getAggregateModelStats(),
-    getSlotDistribution(),
-    getWinsByLength(),
-    listRecentRuns(100),
-  ]);
+  const [aggregate, slotDist, winsByLength, runs, seasons, cost, todaySpend] =
+    await Promise.all([
+      getCachedAggregateModelStats(ACTIVE_ROSTER.id),
+      getCachedSlotDistribution(ACTIVE_ROSTER.id),
+      getCachedWinsByLength(ACTIVE_ROSTER.id),
+      listRecentRuns(100),
+      getCachedSeasonSummaries(),
+      getCachedCostSummary(),
+      getTodaySpendMicroUsd(),
+    ]);
 
   const totalVotes = aggregate.reduce((s, r) => s + r.wins, 0);
   const failedCount = runs.filter((r) => r.status === "failed").length;
   const completeCount = runs.filter((r) => r.status === "complete").length;
+  const dailyCap = dailySpendCapMicroUsd();
 
-  const overall = BENCHMARK_MODELS.map((m) => {
+  const overall = ACTIVE_ROSTER.models.map((m) => {
     const wins = aggregate.find((r) => r.modelSlug === m.slug)?.wins ?? 0;
     const ci = wilsonInterval(wins, totalVotes);
     return { slug: m.slug, label: m.label, wins, ...ci };
@@ -118,7 +127,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   const totalsByLength = new Map<LengthBucket, number>();
   for (const len of LENGTHS) {
     let t = 0;
-    for (const m of BENCHMARK_MODELS) {
+    for (const m of ACTIVE_ROSTER.models) {
       t += lengthIndex.get(`${len}::${m.slug}`) ?? 0;
     }
     totalsByLength.set(len, t);
@@ -127,7 +136,9 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
   return (
     <div className="mx-auto max-w-6xl px-6 pt-12 pb-20">
       <header className="mb-12">
-        <p className="editorial-caps text-ink-muted">⁂ &nbsp; Editor&apos;s Desk</p>
+        <p className="editorial-caps text-ink-muted">
+          ⁂ &nbsp; Editor&apos;s Desk &nbsp;·&nbsp; {ACTIVE_ROSTER.label}
+        </p>
         <h1 className="mt-3 font-display text-4xl italic text-ink">Admin</h1>
         <div className="mt-4 flex flex-wrap gap-x-6 gap-y-1 font-mono text-xs tabular-nums text-ink-muted">
           <span>
@@ -146,8 +157,66 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
           <span>
             <span className="text-ink">{runs.length}</span> recent runs
           </span>
+          <span>
+            <span className="text-ink">{formatUsdMicro(todaySpend)}</span> today
+            &nbsp;/&nbsp;{formatUsdMicro(dailyCap)} cap
+          </span>
         </div>
       </header>
+
+      {/* ── Spend + seasons ──────────────────────────────────────── */}
+      <section className="mb-14 grid gap-8 border-y border-rule py-6 sm:grid-cols-2">
+        <div>
+          <p className="editorial-caps text-ink-muted">
+            <span className="text-oxblood">§</span>&nbsp;&nbsp;Spend
+          </p>
+          <dl className="mt-3 space-y-2 font-mono text-xs tabular-nums">
+            <div className="flex justify-between gap-4">
+              <dt className="text-ink-muted">today (reserved)</dt>
+              <dd className="text-ink">{formatUsdMicro(todaySpend)}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-ink-muted">last 7 days</dt>
+              <dd className="text-ink">{formatUsdMicro(cost.weekMicroUsd)}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-ink-muted">last 30 days</dt>
+              <dd className="text-ink">{formatUsdMicro(cost.monthMicroUsd)}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-ink-muted">completed runs (30d)</dt>
+              <dd className="text-ink">{cost.completedRuns.toLocaleString()}</dd>
+            </div>
+          </dl>
+        </div>
+        <div>
+          <p className="editorial-caps text-ink-muted">
+            <span className="text-oxblood">§</span>&nbsp;&nbsp;Seasons
+          </p>
+          <ul className="mt-3 space-y-2 font-mono text-xs tabular-nums">
+            {seasons.map((season) => {
+              const roster = getRoster(season.rosterId);
+              return (
+                <li
+                  key={season.rosterId}
+                  className="flex flex-wrap items-baseline justify-between gap-x-3"
+                >
+                  <span className="text-ink">
+                    {roster.label}
+                    {season.rosterId === ACTIVE_ROSTER.id && (
+                      <span className="ml-2 text-oxblood">current</span>
+                    )}
+                  </span>
+                  <span className="text-ink-muted">
+                    {season.runs.toLocaleString()} runs ·{" "}
+                    {season.votes.toLocaleString()} votes
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      </section>
 
       {/* ── Win share w/ CIs ─────────────────────────────────────── */}
       <section className="mb-14">
@@ -235,7 +304,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   </p>
                 </div>
                 <div className="space-y-3">
-                  {BENCHMARK_MODELS.map((m) => {
+                  {ACTIVE_ROSTER.models.map((m) => {
                     const wins = lengthIndex.get(`${len}::${m.slug}`) ?? 0;
                     const share = lenTotal === 0 ? 0 : wins / lenTotal;
                     return (
@@ -332,10 +401,16 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                   Status
                 </th>
                 <th className="py-3 text-left editorial-caps text-ink-muted">
+                  Season
+                </th>
+                <th className="py-3 text-left editorial-caps text-ink-muted">
                   Length
                 </th>
                 <th className="py-3 text-left editorial-caps text-ink-muted">
                   Prompt
+                </th>
+                <th className="py-3 text-right editorial-caps text-ink-muted">
+                  Cost
                 </th>
                 <th className="py-3"></th>
               </tr>
@@ -344,7 +419,7 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
               {runs.length === 0 && (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={7}
                     className="py-8 text-center font-serif italic text-ink-muted"
                   >
                     No runs yet.
@@ -365,15 +440,25 @@ export default async function AdminPage({ searchParams }: AdminPageProps) {
                             ? "text-ink"
                             : "text-ink-faint"
                       }
+                      title={r.failureReason ?? undefined}
                     >
                       {r.status}
                     </span>
+                    {r.isReplay && (
+                      <span className="ml-2 text-ink-faint">replay</span>
+                    )}
+                  </td>
+                  <td className="py-3 pr-4 font-mono text-[11px] text-ink-muted">
+                    {getRoster(r.rosterId).label}
                   </td>
                   <td className="py-3 pr-4 font-mono text-[11px] text-ink-muted">
                     {r.promptLengthBucket}
                   </td>
                   <td className="max-w-[40ch] truncate py-3 pr-4 font-serif italic text-ink">
                     {r.promptText}
+                  </td>
+                  <td className="whitespace-nowrap py-3 text-right font-mono text-[11px] tabular-nums text-ink-muted">
+                    {r.isReplay ? "—" : formatUsdMicro(r.totalCostMicroUsd)}
                   </td>
                   <td className="whitespace-nowrap py-3 text-right">
                     <Link

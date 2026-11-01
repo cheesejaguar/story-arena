@@ -1,19 +1,20 @@
 import "server-only";
 import { cookies } from "next/headers";
-import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes } from "node:crypto";
 import { env } from "@/lib/env";
+import { safeEqualHex } from "./constant-time";
 
 const COOKIE = "sa_session";
 const MAX_AGE = 60 * 60 * 24 * 90; // 90 days
+const SESSION_ID_RE = /^[0-9a-f]{32}$/;
 
 function sign(value: string): string {
   return createHmac("sha256", env.SESSION_COOKIE_SECRET).update(value).digest("hex");
 }
 
 function verify(value: string, signature: string): boolean {
-  const expected = sign(value);
-  if (signature.length !== expected.length) return false;
-  return timingSafeEqual(Buffer.from(signature, "hex"), Buffer.from(expected, "hex"));
+  if (!SESSION_ID_RE.test(value)) return false;
+  return safeEqualHex(sign(value), signature);
 }
 
 export async function getOrCreateSessionId(): Promise<string> {

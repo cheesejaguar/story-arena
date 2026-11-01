@@ -1,7 +1,14 @@
 import { streamText } from "ai";
 import { getSystemPrompt } from "./prompts";
+import {
+  costMicroUsd,
+  getModelBySlug,
+  reasoningProviderOptions,
+  type BenchmarkModel,
+  type ModelSlug,
+} from "./models";
 import { lengthToTargetTokens, type LengthBucket } from "@/lib/utils/length";
-import type { ModelSlug } from "./models";
+import { estimatePromptTokens } from "@/lib/utils/cost";
 
 export type StoryMeta = {
   modelSlug: ModelSlug;
@@ -10,6 +17,8 @@ export type StoryMeta = {
   tokenInput?: number;
   tokenOutput?: number;
   finishReason?: string;
+  /** Actual (or estimated) cost in micro-USD. */
+  costMicroUsd: number;
 };
 
 export type StoryStreamEvent =
@@ -21,7 +30,21 @@ export type GenerateInput = {
   modelSlug: ModelSlug;
   length: LengthBucket;
   systemPromptVersion: string;
+  /** Cancels the upstream request when the client disconnects. */
+  signal?: AbortSignal;
+  /** Wall-clock ceiling for one story. */
+  timeoutMs?: number;
 };
+
+function abortError(): Error {
+  const err = new Error("Generation aborted");
+  err.name = "AbortError";
+  return err;
+}
+
+function estimateOutputTokens(text: string): number {
+  return Math.max(1, Math.ceil(text.length / 4));
+}
 
 /**
  * Stream a single story from one model via Vercel AI Gateway.
@@ -38,6 +61,8 @@ export type GenerateInput = {
 export async function* generateStoryStream(
   input: GenerateInput,
 ): AsyncGenerator<StoryStreamEvent, void, void> {
+  if (input.signal?.aborted) throw abortError();
+
   if (process.env.MOCK_AI === "1") {
     const mockText = `# The Lighthouse at the Edge
 
@@ -50,6 +75,7 @@ In the salt-dark between sweeps, she heard a second voice answer her own.`;
     // Simulate streaming in small chunks so the client animation looks real.
     const chunkSize = 18;
     for (let i = 0; i < mockText.length; i += chunkSize) {
+      if (input.signal?.aborted) throw abortError();
       yield { type: "delta", text: mockText.slice(i, i + chunkSize) };
       // Tiny delay so React can paint between chunks under Playwright
       await new Promise((r) => setTimeout(r, 3));
@@ -63,10 +89,14 @@ In the salt-dark between sweeps, she heard a second voice answer her own.`;
         tokenInput: 10,
         tokenOutput: 80,
         finishReason: "stop",
+        costMicroUsd: 0,
       },
     };
     return;
   }
+
+  const model = getModelBySlug(input.modelSlug);
+  if (!model) throw new Error(`Unknown model slug: ${input.modelSlug}`);
 
   const t0 = Date.now();
   // No explicit Authorization header — the AI SDK gateway provider auto-resolves
@@ -75,12 +105,20 @@ In the salt-dark between sweeps, she heard a second voice answer her own.`;
     model: input.modelSlug, // routed via AI Gateway
     system: getSystemPrompt(input.systemPromptVersion),
     prompt: input.prompt,
-    maxOutputTokens: lengthToTargetTokens(input.length),
-    temperature: 0.9,
+    // Leave headroom above the prose target for titles and formatting, but
+    // never enough to let a runaway reasoning model bill indefinitely.
+    maxOutputTokens: Math.ceil(lengthToTargetTokens(input.length) * 1.2) + 200,
+    // GPT-5-class reasoning models reject temperature when reasoning is on.
+    temperature: model.provider === "openai" ? undefined : 0.9,
+    providerOptions: reasoningProviderOptions(model),
+    maxRetries: 1,
+    abortSignal: input.signal,
+    timeout: input.timeoutMs ?? 150_000,
   });
 
   let accumulated = "";
   for await (const delta of result.textStream) {
+    if (input.signal?.aborted) throw abortError();
     accumulated += delta;
     yield { type: "delta", text: delta };
   }
@@ -90,15 +128,36 @@ In the salt-dark between sweeps, she heard a second voice answer her own.`;
     result.finishReason,
   ]);
 
+  if (input.signal?.aborted) throw abortError();
+
+  if (accumulated.trim().length < 20) {
+    throw new Error("Model returned an empty or near-empty story");
+  }
+  if (finishReason === "length") {
+    throw new Error("Model hit the output token limit before finishing");
+  }
+
+  const tokenInput = usage?.inputTokens ?? estimatePromptTokens(input.prompt);
+  const tokenOutput = usage?.outputTokens ?? estimateOutputTokens(accumulated);
+
   yield {
     type: "done",
     meta: {
       modelSlug: input.modelSlug,
       outputText: accumulated,
       latencyMs: Date.now() - t0,
-      tokenInput: usage?.inputTokens,
-      tokenOutput: usage?.outputTokens,
+      tokenInput,
+      tokenOutput,
       finishReason,
+      costMicroUsd: costFor(model, tokenInput, tokenOutput),
     },
   };
+}
+
+function costFor(
+  model: BenchmarkModel,
+  inputTokens: number,
+  outputTokens: number,
+): number {
+  return costMicroUsd(model, inputTokens, outputTokens);
 }

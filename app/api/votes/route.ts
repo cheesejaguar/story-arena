@@ -1,22 +1,39 @@
 import { NextResponse } from "next/server";
 import { SubmitVoteSchema } from "@/lib/utils/validation";
 import { getOrCreateSessionId } from "@/lib/security/session";
-import { voteLimiter } from "@/lib/security/rate-limit";
+import { checkLimit, ipVoteLimiter, voteLimiter } from "@/lib/security/rate-limit";
+import { getClientIp, isSameOrigin } from "@/lib/security/request";
 import {
   findExistingVote,
   insertVote,
   getRunWithOutputs,
 } from "@/lib/db/queries";
+import { computeFraudScore } from "@/lib/utils/fraud";
+import { invalidateStatsCache } from "@/lib/db/stats-cache";
 import { logger } from "@/lib/utils/logger";
 
 export const runtime = "nodejs";
 
+function isUniqueViolation(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const candidate = err as { code?: string; cause?: { code?: string } };
+  return candidate.code === "23505" || candidate.cause?.code === "23505";
+}
+
 export async function POST(req: Request) {
   try {
-    const sessionId = await getOrCreateSessionId();
+    if (!isSameOrigin(req)) {
+      return NextResponse.json({ error: "Cross-origin request rejected" }, { status: 403 });
+    }
 
-    const { success } = await voteLimiter.limit(sessionId);
-    if (!success) {
+    const sessionId = await getOrCreateSessionId();
+    const ip = getClientIp(req);
+
+    const [sessionLimit, ipLimit] = await Promise.all([
+      checkLimit(voteLimiter, sessionId),
+      checkLimit(ipVoteLimiter, ip),
+    ]);
+    if (!sessionLimit.success || !ipLimit.success) {
       return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
     }
 
@@ -54,19 +71,38 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid slot" }, { status: 400 });
     }
 
-    await insertVote({
-      runId: v.runId,
-      sessionId,
-      chosenSlot: v.chosenSlot,
-      chosenModelSlug: chosen.modelSlug,
-      reasonText: v.reason ?? null,
+    const fraudScore = computeFraudScore({
       timeToVoteMs: v.timeToVoteMs,
       allStoriesViewed: v.allStoriesViewed,
-      scrollDepthA: v.scrollDepthA ?? null,
-      scrollDepthB: v.scrollDepthB ?? null,
-      scrollDepthC: v.scrollDepthC ?? null,
-      fraudScore: 0,
+      scrollDepths: [v.scrollDepthA, v.scrollDepthB, v.scrollDepthC],
     });
+
+    try {
+      await insertVote({
+        runId: v.runId,
+        sessionId,
+        chosenSlot: v.chosenSlot,
+        chosenModelSlug: chosen.modelSlug,
+        reasonText: v.reason ?? null,
+        timeToVoteMs: v.timeToVoteMs,
+        allStoriesViewed: v.allStoriesViewed,
+        scrollDepthA: v.scrollDepthA ?? null,
+        scrollDepthB: v.scrollDepthB ?? null,
+        scrollDepthC: v.scrollDepthC ?? null,
+        fraudScore,
+      });
+    } catch (err) {
+      // Two concurrent tabs can both pass the read check. The unique index is
+      // the real guard; translate its violation into the same 409 as a
+      // normal duplicate instead of a 500.
+      if (isUniqueViolation(err)) {
+        logger.info({ sessionId, runId: v.runId }, "vote.duplicate.race");
+        return NextResponse.json({ error: "Already voted" }, { status: 409 });
+      }
+      throw err;
+    }
+
+    invalidateStatsCache();
 
     logger.info(
       {
@@ -74,6 +110,7 @@ export async function POST(req: Request) {
         runId: v.runId,
         chosenSlot: v.chosenSlot,
         chosenModelSlug: chosen.modelSlug,
+        fraudScore,
       },
       "vote.recorded",
     );

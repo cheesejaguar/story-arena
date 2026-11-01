@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -13,71 +13,136 @@ import {
 } from "./live-compare";
 import type { LengthBucket } from "@/lib/utils/length";
 import type { Slot } from "@/lib/utils/randomize-slots";
-
-/**
- * Events that the streaming /api/runs endpoint emits on a success path.
- * Each is one newline-delimited JSON object in the response body.
- */
-type StreamEvent =
-  | { type: "init"; runId: string }
-  | { type: "slot_delta"; slot: Slot; text: string }
-  | { type: "slot_done"; slot: Slot }
-  | { type: "slot_error"; slot: Slot }
-  | { type: "done"; runId: string; redirectTo: string }
-  | { type: "error"; error: string };
+import type { RunStreamEvent } from "@/lib/utils/stream-protocol";
 
 type Phase = "idle" | "streaming" | "done";
 
+type PendingFrame = {
+  deltas: Partial<Record<Slot, string>>;
+  done: Slot[];
+  runId?: string;
+  ready?: boolean;
+  error?: string;
+  hasChanges: boolean;
+};
+
+function emptyFrame(): PendingFrame {
+  return { deltas: {}, done: [], hasChanges: false };
+}
+
+/**
+ * Coalesces stream events into one React update per animation frame. Without
+ * this, a 900-token story produces hundreds of renders per second across
+ * three cards.
+ */
 export function PromptForm() {
   const [prompt, setPrompt] = useState("");
   const [length, setLength] = useState<LengthBucket>("medium");
   const [phase, setPhase] = useState<Phase>("idle");
   const [liveState, setLiveState] = useState<LiveState>(INITIAL_LIVE_STATE);
 
+  const abortRef = useRef<AbortController | null>(null);
+  const frameRef = useRef<number | null>(null);
+  const pendingRef = useRef<PendingFrame>(emptyFrame());
+  const mountedRef = useRef(true);
+  // Reuse the key when the user retries the same prompt after a network
+  // failure. Without this, a retry while the first run is still pending would
+  // start (and pay for) a second generation.
+  const lastAttemptRef = useRef<{
+    key: string;
+    prompt: string;
+    length: LengthBucket;
+  } | null>(null);
+
+  const flush = useCallback(() => {
+    frameRef.current = null;
+    const pending = pendingRef.current;
+    if (!pending.hasChanges) return;
+    pendingRef.current = emptyFrame();
+
+    setLiveState((prev) => {
+      const texts = { ...prev.texts };
+      for (const slot of ["A", "B", "C"] as Slot[]) {
+        const chunk = pending.deltas[slot];
+        if (chunk) texts[slot] += chunk;
+      }
+      const slotsDone = new Set(prev.slotsDone);
+      for (const slot of pending.done) slotsDone.add(slot);
+      return {
+        ...prev,
+        runId: pending.runId ?? prev.runId,
+        texts,
+        slotsDone,
+        ready: pending.ready ?? prev.ready,
+        error: pending.error ?? prev.error,
+      };
+    });
+  }, []);
+
+  const scheduleFlush = useCallback(() => {
+    if (frameRef.current != null) return;
+    frameRef.current = requestAnimationFrame(flush);
+  }, [flush]);
+
+  const handleStreamEvent = useCallback(
+    (evt: RunStreamEvent) => {
+      const pending = pendingRef.current;
+      pending.hasChanges = true;
+
+      switch (evt.type) {
+        case "init":
+          pending.runId = evt.runId;
+          break;
+        case "slot_delta":
+          pending.deltas[evt.slot] =
+            (pending.deltas[evt.slot] ?? "") + evt.text;
+          break;
+        case "slot_done":
+        case "slot_error":
+          pending.done.push(evt.slot);
+          break;
+        case "done":
+          pending.ready = true;
+          pending.runId = evt.runId;
+          // The action succeeded; a later submit is a new action.
+          lastAttemptRef.current = null;
+          break;
+        case "error":
+          pending.error = evt.error;
+          break;
+      }
+
+      scheduleFlush();
+
+      if (evt.type === "done") setPhase("done");
+      if (evt.type === "error") {
+        toast.error(evt.error);
+        setPhase("done");
+      }
+    },
+    [scheduleFlush],
+  );
+
   const resetAll = useCallback(() => {
+    abortRef.current?.abort();
+    abortRef.current = null;
+    if (frameRef.current != null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+    pendingRef.current = emptyFrame();
     setPhase("idle");
     setLiveState(INITIAL_LIVE_STATE);
     setPrompt("");
   }, []);
 
-  const handleStreamEvent = useCallback((evt: StreamEvent) => {
-    setLiveState((prev) => {
-      switch (evt.type) {
-        case "init":
-          return { ...prev, runId: evt.runId };
-        case "slot_delta":
-          return {
-            ...prev,
-            texts: {
-              ...prev.texts,
-              [evt.slot]: (prev.texts[evt.slot] ?? "") + evt.text,
-            },
-          };
-        case "slot_done": {
-          const next = new Set(prev.slotsDone);
-          next.add(evt.slot);
-          return { ...prev, slotsDone: next };
-        }
-        case "slot_error": {
-          const next = new Set(prev.slotsDone);
-          next.add(evt.slot); // treat as "done but broken" so UI stops waiting
-          return { ...prev, slotsDone: next };
-        }
-        case "done":
-          return { ...prev, ready: true };
-        case "error":
-          return { ...prev, error: evt.error, ready: false };
-        default:
-          return prev;
-      }
-    });
-    if (evt.type === "done") {
-      setPhase("done");
-    }
-    if (evt.type === "error") {
-      toast.error(evt.error);
-      setPhase("done"); // terminal — the LiveCompare will render its error state
-    }
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      abortRef.current?.abort();
+      if (frameRef.current != null) cancelAnimationFrame(frameRef.current);
+    };
   }, []);
 
   async function handleSubmit(e: React.FormEvent) {
@@ -88,48 +153,95 @@ export function PromptForm() {
       return;
     }
 
+    abortRef.current?.abort();
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     setPhase("streaming");
     setLiveState(INITIAL_LIVE_STATE);
+    pendingRef.current = emptyFrame();
+
+    const trimmedPrompt = prompt.trim();
+    const previousAttempt = lastAttemptRef.current;
+    const idempotencyKey =
+      previousAttempt &&
+      previousAttempt.prompt === trimmedPrompt &&
+      previousAttempt.length === length
+        ? previousAttempt.key
+        : typeof crypto !== "undefined" && "randomUUID" in crypto
+          ? crypto.randomUUID()
+          : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    lastAttemptRef.current = {
+      key: idempotencyKey,
+      prompt: trimmedPrompt,
+      length,
+    };
 
     let res: Response;
     try {
       res = await fetch("/api/runs", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: prompt.trim(), length }),
+        headers: {
+          "Content-Type": "application/json",
+          "Idempotency-Key": idempotencyKey,
+        },
+        body: JSON.stringify({ prompt: trimmedPrompt, length }),
+        signal: controller.signal,
       });
     } catch {
+      if (controller.signal.aborted) return;
       toast.error("Network error. Try again.");
-      setPhase("idle");
+      if (mountedRef.current) setPhase("idle");
       return;
     }
 
     // Non-200 responses are plain JSON (rate limit, validation, moderation)
     // and don't carry a stream body.
     if (!res.ok) {
-      const data = await res.json().catch(() => ({}));
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        code?: string;
+      };
       const msg =
-        res.status === 429
-          ? "You're going too fast. Try again in a bit."
-          : res.status === 422
-            ? data.error || "That prompt was blocked by moderation."
-            : data.error || "Something went wrong. Try again.";
+        res.status === 429 && data.code === "DAILY_SPEND_CAP"
+          ? "The daily generation budget is exhausted. Try again tomorrow."
+          : res.status === 429
+            ? "You're going too fast. Try again in a bit."
+            : res.status === 409 && data.code === "RUN_IN_PROGRESS"
+              ? "This run is already being generated. Give it a moment."
+              : res.status === 422
+                ? data.error || "That prompt was blocked by moderation."
+                : res.status === 503
+                  ? "The press is at capacity. Try again in a moment."
+                  : data.error || "Something went wrong. Try again.";
       toast.error(msg);
-      setPhase("idle");
+      if (mountedRef.current) setPhase("idle");
       return;
     }
 
     if (!res.body) {
       toast.error("No response body from the server.");
-      setPhase("idle");
+      if (mountedRef.current) setPhase("idle");
       return;
     }
 
     // Read NDJSON stream line-by-line.
-    const reader = res.body
-      .pipeThrough(new TextDecoderStream())
-      .getReader();
+    const reader = res.body.pipeThrough(new TextDecoderStream()).getReader();
     let buffer = "";
+    let terminal = false;
+
+    const dispatchLine = (line: string) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      try {
+        const evt = JSON.parse(trimmed) as RunStreamEvent;
+        if (evt.type === "done" || evt.type === "error") terminal = true;
+        handleStreamEvent(evt);
+      } catch {
+        // Malformed line — skip it rather than killing the stream.
+      }
+    };
+
     try {
       for (;;) {
         const { done, value } = await reader.read();
@@ -137,29 +249,21 @@ export function PromptForm() {
         buffer += value;
         const lines = buffer.split("\n");
         buffer = lines.pop() ?? "";
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed) continue;
-          try {
-            const evt = JSON.parse(trimmed) as StreamEvent;
-            handleStreamEvent(evt);
-          } catch {
-            // Malformed line — skip it rather than killing the stream.
-          }
-        }
+        for (const line of lines) dispatchLine(line);
       }
       // Flush any tail that arrived without a trailing newline.
-      const tail = buffer.trim();
-      if (tail) {
-        try {
-          handleStreamEvent(JSON.parse(tail) as StreamEvent);
-        } catch {
-          /* ignore */
-        }
+      dispatchLine(buffer);
+
+      if (!terminal && !controller.signal.aborted) {
+        toast.error("The stream ended unexpectedly. Try again.");
+        if (mountedRef.current) setPhase("idle");
       }
     } catch {
+      if (controller.signal.aborted) return;
       toast.error("The stream was interrupted. Try again.");
-      setPhase("idle");
+      if (mountedRef.current) setPhase("idle");
+    } finally {
+      if (abortRef.current === controller) abortRef.current = null;
     }
   }
 
@@ -167,7 +271,10 @@ export function PromptForm() {
   if (phase === "streaming" || phase === "done") {
     return (
       <div className="space-y-8">
-        <LiveCompare state={liveState} />
+        <LiveCompare
+          key={liveState.runId ?? "pending"}
+          state={liveState}
+        />
         {(liveState.ready || liveState.error) && (
           <div className="mx-auto mt-6 max-w-md text-center">
             <button

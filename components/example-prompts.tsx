@@ -1,7 +1,7 @@
 "use client";
 
 import { REDDIT_WRITING_PROMPTS } from "@/data/reddit-writing-prompts";
-import { getHomepageArchivePrompts } from "@/lib/seed/reddit-seed";
+import { getHomepageArchivePrompts } from "@/lib/seed/archive";
 
 const PROMPTS = getHomepageArchivePrompts(REDDIT_WRITING_PROMPTS, 6);
 
