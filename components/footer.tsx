@@ -21,6 +21,13 @@ export function Footer() {
           </Link>
           <span className="text-ink-faint">·</span>
           <Link
+            href="/jokes"
+            className="editorial-caps text-ink-muted transition-colors hover:text-oxblood"
+          >
+            Joke Arena
+          </Link>
+          <span className="text-ink-faint">·</span>
+          <Link
             href="/results"
             className="editorial-caps text-ink-muted transition-colors hover:text-oxblood"
           >

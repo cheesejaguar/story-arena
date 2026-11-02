@@ -8,6 +8,7 @@ import {
   getWinsByLength,
   listSeasonSummaries,
 } from "./queries";
+import type { Arena } from "@/lib/arena";
 
 /**
  * Stats are expensive aggregate queries but tolerate a minute of staleness.
@@ -18,25 +19,28 @@ import {
 const REVALIDATE_SECONDS = 60;
 
 export const getCachedAggregateModelStats = unstable_cache(
-  async (rosterId?: string) => getAggregateModelStats(rosterId),
+  async (rosterId?: string, arena: Arena = "story") =>
+    getAggregateModelStats(rosterId, arena),
   ["aggregate-model-stats"],
   { tags: [STATS_TAG], revalidate: REVALIDATE_SECONDS },
 );
 
 export const getCachedSlotDistribution = unstable_cache(
-  async (rosterId?: string) => getSlotDistribution(rosterId),
+  async (rosterId?: string, arena: Arena = "story") =>
+    getSlotDistribution(rosterId, arena),
   ["slot-distribution"],
   { tags: [STATS_TAG], revalidate: REVALIDATE_SECONDS },
 );
 
 export const getCachedWinsByLength = unstable_cache(
-  async (rosterId?: string) => getWinsByLength(rosterId),
+  async (rosterId?: string, arena: Arena = "story") =>
+    getWinsByLength(rosterId, arena),
   ["wins-by-length"],
   { tags: [STATS_TAG], revalidate: REVALIDATE_SECONDS },
 );
 
 export const getCachedSeasonSummaries = unstable_cache(
-  async () => listSeasonSummaries(),
+  async (arena: Arena = "story") => listSeasonSummaries(arena),
   ["season-summaries"],
   { tags: [STATS_TAG], revalidate: REVALIDATE_SECONDS },
 );

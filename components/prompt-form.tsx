@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { LengthPicker } from "./length-picker";
-import { ExamplePrompts } from "./example-prompts";
+import { ExamplePrompts, type ExamplePrompt } from "./example-prompts";
 import {
   LiveCompare,
   INITIAL_LIVE_STATE,
@@ -14,6 +14,7 @@ import {
 import type { LengthBucket } from "@/lib/utils/length";
 import type { Slot } from "@/lib/utils/randomize-slots";
 import type { RunStreamEvent } from "@/lib/utils/stream-protocol";
+import { JOKE_PROMPT_MAX_CHARS, type Arena } from "@/lib/arena";
 
 type Phase = "idle" | "streaming" | "done";
 
@@ -35,7 +36,18 @@ function emptyFrame(): PendingFrame {
  * this, a 900-token story produces hundreds of renders per second across
  * three cards.
  */
-export function PromptForm() {
+export function PromptForm({
+  arena = "story",
+  examples,
+  examplesHeading,
+}: {
+  arena?: Arena;
+  /** Curated prompts, chosen server-side so each arena ships only its own. */
+  examples: ExamplePrompt[];
+  examplesHeading: string;
+}) {
+  const isJoke = arena === "joke";
+  const maxChars = isJoke ? JOKE_PROMPT_MAX_CHARS : 4000;
   const [prompt, setPrompt] = useState("");
   const [length, setLength] = useState<LengthBucket>("medium");
   const [phase, setPhase] = useState<Phase>("idle");
@@ -185,7 +197,7 @@ export function PromptForm() {
           "Content-Type": "application/json",
           "Idempotency-Key": idempotencyKey,
         },
-        body: JSON.stringify({ prompt: trimmedPrompt, length }),
+        body: JSON.stringify({ prompt: trimmedPrompt, length, arena }),
         signal: controller.signal,
       });
     } catch {
@@ -274,6 +286,7 @@ export function PromptForm() {
         <LiveCompare
           key={liveState.runId ?? "pending"}
           state={liveState}
+          arena={arena}
         />
         {(liveState.ready || liveState.error) && (
           <div className="mx-auto mt-6 max-w-md text-center">
@@ -303,22 +316,30 @@ export function PromptForm() {
           </span>
           <span className="hairline flex-1" />
           <span className="editorial-caps text-ink-faint tabular-nums">
-            {charCount.toString().padStart(4, "0")} / 4000
+            {charCount.toString().padStart(String(maxChars).length, "0")} / {maxChars}
           </span>
         </div>
 
         <Textarea
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
-          placeholder="Write a fictional prompt — or borrow one from the Reddit archive below."
-          rows={5}
-          maxLength={4000}
+          placeholder={
+            isJoke
+              ? "Write a joke setup or a topic — or borrow one from the list below."
+              : "Write a fictional prompt — or borrow one from the Reddit archive below."
+          }
+          rows={isJoke ? 3 : 5}
+          maxLength={maxChars}
           className="resize-none rounded-none border-0 border-y border-ink/80 bg-transparent px-0 py-5 font-serif text-lg italic leading-relaxed text-ink placeholder:text-ink-faint placeholder:italic focus-visible:border-oxblood focus-visible:ring-0 focus-visible:ring-offset-0"
         />
       </div>
 
-      {/* ── Curated prompts from Reddit ─────────────────────────────── */}
-      <ExamplePrompts onPick={(t) => setPrompt(t)} />
+      {/* ── Curated prompts ─────────────────────────────────────────── */}
+      <ExamplePrompts
+        prompts={examples}
+        heading={examplesHeading}
+        onPick={(t) => setPrompt(t)}
+      />
 
       {/* ── Submission row ──────────────────────────────────────────── */}
       <div>
@@ -329,10 +350,16 @@ export function PromptForm() {
         </div>
 
         <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-baseline sm:justify-between">
-          <div className="flex items-center gap-4">
-            <span className="editorial-caps text-ink-muted">Length</span>
-            <LengthPicker value={length} onChange={setLength} disabled={false} />
-          </div>
+          {isJoke ? (
+            <p className="font-serif text-sm italic text-ink-muted">
+              One setup, three comics. No length to pick — just the funniest punchline.
+            </p>
+          ) : (
+            <div className="flex items-center gap-4">
+              <span className="editorial-caps text-ink-muted">Length</span>
+              <LengthPicker value={length} onChange={setLength} disabled={false} />
+            </div>
+          )}
 
           <Button
             type="submit"
@@ -341,7 +368,7 @@ export function PromptForm() {
             className="group relative rounded-none border border-ink bg-ink px-8 py-6 font-display text-lg italic font-normal text-paper shadow-none transition-all hover:bg-oxblood-deep hover:border-oxblood-deep disabled:border-rule disabled:bg-paper-deep disabled:text-ink-faint"
           >
             <span className="editorial-caps mr-3 text-paper/60 group-hover:text-paper/70 group-disabled:text-ink-faint">
-              Generate stories
+              {isJoke ? "Generate jokes" : "Generate stories"}
             </span>
             <span className="text-xl not-italic">→</span>
           </Button>

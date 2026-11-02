@@ -1,11 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { lengthToTargetTokens, parseLength } from "@/lib/utils/length";
+import { lengthToTargetTokens, parseLength, targetTokensFor } from "@/lib/utils/length";
 
 describe("length helpers", () => {
   it("maps each bucket to a target token count", () => {
     expect(lengthToTargetTokens("short")).toBe(400);
     expect(lengthToTargetTokens("medium")).toBe(900);
     expect(lengthToTargetTokens("long")).toBe(1800);
+  });
+  it("gives jokes a fixed small budget regardless of bucket", () => {
+    expect(targetTokensFor("joke", "long")).toBe(300);
+    expect(targetTokensFor("story", "long")).toBe(1800);
   });
   it("parses with default fallback to medium", () => {
     expect(parseLength("short")).toBe("short");

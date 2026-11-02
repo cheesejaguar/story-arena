@@ -41,6 +41,7 @@ Rosters are frozen per season. When the lineup rotates, runs keep the roster tha
 - 🗳️ One-click voting with optional reason text
 - 🎭 Post-vote reveal showing which model wrote which story
 - 🧑‍⚖️ **The Bench** (`/judge`) — vote on prompts other people submitted
+- 🎤 **Joke Arena** (`/jokes`, `/jokes/judge`) — the same blind three-way contest for jokes: pick a setup, read three punchlines, vote for the funniest
 - 🏆 Public standings with season filtering, slot-bias distribution, and win rates by length
 - 📚 Season archive — historical runs resolve against the roster that produced them
 - 🔁 Cross-session replay — an identical prompt/length/roster reuses existing stories with a fresh shuffle instead of paying twice
@@ -50,6 +51,24 @@ Rosters are frozen per season. When the lineup rotates, runs keep the roster tha
 - 🚦 Global concurrency gate and per-run timeouts
 - 🎨 Literary typography (Cormorant Garamond display, Fraunces body, IBM Plex Mono labels)
 - ♿ Keyboard-selectable story cards, reduced-motion support, mobile-first layout
+
+---
+
+## 🎤 Joke Arena
+
+Joke Arena reuses the whole pipeline (streaming, blinding, voting, replay, spend cap) with a second contest. Every run stores an `arena` (`story` or `joke`), and every stat, Bench query, and season summary filters on it, so joke votes never enter the fiction leaderboard. `/results?arena=joke` shows the joke standings.
+
+- **Prompt:** joke runs use their own versioned system prompt (`joke-v1`): one original joke, punchline for a setup or a short joke for a topic, 120 words max.
+- **Length:** no picker. Joke runs are stored as `short` with a 300-token output budget, so a run costs a fraction of a story run.
+- **Replay:** the joke prompt version is part of the dedupe key, so a joke run can only replay another joke run.
+- **Prompts:** the homepage shows setups pulled from joke subreddits (titles from posts whose punchline is in the body), topped up with a dozen original house prompts. Reddit blocks anonymous API access, so fetching needs a [script app](https://www.reddit.com/prefs/apps):
+
+  ```bash
+  REDDIT_CLIENT_ID=... REDDIT_CLIENT_SECRET=... pnpm fetch:reddit:jokes
+  # optional: REDDIT_JOKE_SUBREDDITS=Jokes,dadjokes REDDIT_JOKE_LIMIT=60
+  ```
+
+  This rewrites `data/reddit-joke-prompts.ts`; commit it to ship the prompts.
 
 ---
 
@@ -241,6 +260,7 @@ pnpm exec tsc --noEmit       # Type-check
 pnpm lint                    # ESLint
 pnpm build                   # Next.js production build
 pnpm db:seed:reddit          # insert / verify the 25 Reddit starter runs
+pnpm fetch:reddit:jokes      # refresh Joke Arena setups (needs Reddit app creds)
 MOCK_AI=1 pnpm test:e2e      # Playwright happy path
 ```
 
@@ -336,7 +356,7 @@ vercel deploy           # preview
 vercel deploy --prod    # production
 ```
 
-Run `pnpm db:migrate` against the production database before the first deploy that includes a new migration. The migration adds roster, replay, cost, and failure columns and backfills existing runs to `legacy-2026-Q2`.
+Run `pnpm db:migrate` against the production database before the first deploy that includes a new migration. Migration `0002` adds roster, replay, cost, and failure columns and backfills existing runs to `legacy-2026-Q2`. Migration `0003` adds the `arena` column (existing runs default to `story`), which Joke Arena requires.
 
 ---
 

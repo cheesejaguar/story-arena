@@ -5,13 +5,16 @@ import { CompareGrid, type CompareStory } from "@/components/compare-grid";
 import { VotePanel, type Reveal } from "@/components/vote-panel";
 import { RevealPanel } from "@/components/reveal-panel";
 import type { Slot } from "@/lib/utils/randomize-slots";
+import type { Arena } from "@/lib/arena";
 
 export function CompareClient({
   runId,
   stories,
+  arena,
 }: {
   runId: string;
   stories: CompareStory[];
+  arena: Arena;
 }) {
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [viewed, setViewed] = useState<Set<Slot>>(new Set());
@@ -42,7 +45,7 @@ export function CompareClient({
   }
 
   if (reveal && selectedSlot) {
-    return <RevealPanel reveal={reveal} chosenSlot={selectedSlot} />;
+    return <RevealPanel reveal={reveal} chosenSlot={selectedSlot} arena={arena} />;
   }
 
   return (
@@ -54,6 +57,7 @@ export function CompareClient({
         onSelect={setSelectedSlot}
         onViewed={handleViewed}
         onScrollDepth={handleScrollDepth}
+        arena={arena}
       />
       <VotePanel
         runId={runId}
@@ -62,6 +66,7 @@ export function CompareClient({
         startTime={startTime}
         scrollDepths={scrollDepths}
         onVoted={setReveal}
+        arena={arena}
       />
     </>
   );

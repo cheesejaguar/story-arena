@@ -1,6 +1,14 @@
 import { cookies } from "next/headers";
 import Link from "next/link";
 import { PromptForm } from "@/components/prompt-form";
+import { REDDIT_WRITING_PROMPTS } from "@/data/reddit-writing-prompts";
+import { getHomepageArchivePrompts } from "@/lib/seed/archive";
+
+const EXAMPLES = getHomepageArchivePrompts(REDDIT_WRITING_PROMPTS, 6).map((p) => ({
+  id: p.redditId,
+  text: p.promptText,
+  source: "r/WritingPrompts",
+}));
 
 export default async function HomePage() {
   // Touch the cookie store so this page renders dynamically. The actual
@@ -27,6 +35,13 @@ export default async function HomePage() {
               className="transition-colors hover:text-oxblood"
             >
               The Bench
+            </Link>
+            <span className="text-ink-faint">·</span>
+            <Link
+              href="/jokes"
+              className="transition-colors hover:text-oxblood"
+            >
+              Joke Arena
             </Link>
             <span className="text-ink-faint">·</span>
             <Link
@@ -99,7 +114,7 @@ export default async function HomePage() {
 
       {/* ── Form ─────────────────────────────────────────────────────── */}
       <section className="rise-in rise-in-4 mx-auto max-w-4xl px-6 pt-8 pb-24">
-        <PromptForm />
+        <PromptForm examples={EXAMPLES} examplesHeading="From r/WritingPrompts" />
       </section>
 
       {/* ── Foot note ────────────────────────────────────────────────── */}

@@ -6,11 +6,12 @@ import {
   getRandomUnvotedRun,
 } from "@/lib/db/queries";
 import { logger } from "@/lib/utils/logger";
+import { parseArena } from "@/lib/arena";
 
 export const runtime = "nodejs";
 
 /**
- * GET /api/judge/next
+ * GET /api/judge/next[?arena=joke]
  *
  * Returns one random completed run that the current session has NOT already
  * voted on, plus lightweight stats for the judge UI. The payload is BLINDED:
@@ -21,15 +22,16 @@ export const runtime = "nodejs";
  *   OR
  *   { run: null, stats: { votedByYou, remaining } } — if there's nothing to judge
  */
-export async function GET() {
+export async function GET(req: Request) {
   try {
     const sessionId = await getOrCreateSessionId();
+    const arena = parseArena(new URL(req.url).searchParams.get("arena"));
 
     // Fetch in parallel: the next run AND the session's cumulative stats
     const [data, votedByYou, remaining] = await Promise.all([
-      getRandomUnvotedRun(sessionId),
-      countVotesBySession(sessionId),
-      countUnvotedRuns(sessionId),
+      getRandomUnvotedRun(sessionId, arena),
+      countVotesBySession(sessionId, arena),
+      countUnvotedRuns(sessionId, arena),
     ]);
 
     if (!data) {

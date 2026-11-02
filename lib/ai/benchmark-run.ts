@@ -7,10 +7,12 @@ import { generateStoryStream, type StoryMeta } from "./generate-story";
 import { randomizeSlots, type Slot } from "@/lib/utils/randomize-slots";
 import { AsyncQueue } from "@/lib/utils/async-queue";
 import type { LengthBucket } from "@/lib/utils/length";
+import type { Arena } from "@/lib/arena";
 
 export type BenchmarkInput = {
   prompt: string;
   length: LengthBucket;
+  arena?: Arena;
   systemPromptVersion: string;
   /** Roster for this run. Defaults to the active season. */
   roster?: ModelRoster;
@@ -81,6 +83,7 @@ export async function* streamBenchmarkRun(
           prompt: input.prompt,
           modelSlug: model.slug,
           length: input.length,
+          arena: input.arena,
           systemPromptVersion: input.systemPromptVersion,
           signal: input.signal,
           timeoutMs: input.timeoutMs,

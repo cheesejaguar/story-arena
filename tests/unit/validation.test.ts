@@ -20,6 +20,17 @@ describe("CreateRunSchema", () => {
   it("rejects too-long prompt", () => {
     expect(() => CreateRunSchema.parse({ prompt: "x".repeat(5000) })).toThrow();
   });
+  it("defaults arena to story", () => {
+    expect(CreateRunSchema.parse({ prompt: "Write a story" }).arena).toBe("story");
+  });
+  it("accepts joke runs and caps joke prompt length", () => {
+    expect(CreateRunSchema.parse({ prompt: "Why did the robot cross the road?", arena: "joke" }).arena).toBe("joke");
+    expect(() => CreateRunSchema.parse({ prompt: "x".repeat(501), arena: "joke" })).toThrow();
+    expect(CreateRunSchema.parse({ prompt: "x".repeat(501) }).arena).toBe("story");
+  });
+  it("rejects unknown arena", () => {
+    expect(() => CreateRunSchema.parse({ prompt: "Write a story", arena: "poem" })).toThrow();
+  });
   it("rejects invalid length", () => {
     expect(() => CreateRunSchema.parse({ prompt: "Write a story", length: "xl" })).toThrow();
   });

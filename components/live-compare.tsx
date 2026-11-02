@@ -6,6 +6,7 @@ import { CompareGrid } from "./compare-grid";
 import { VotePanel, type Reveal } from "./vote-panel";
 import { RevealPanel } from "./reveal-panel";
 import type { Slot } from "@/lib/utils/randomize-slots";
+import { ARENA_COPY, type Arena } from "@/lib/arena";
 
 export type LiveState = {
   runId: string | null;
@@ -38,7 +39,14 @@ export const INITIAL_LIVE_STATE: LiveState = {
  * The component is driven entirely by the `state` prop, so the parent
  * (PromptForm) owns the stream lifecycle.
  */
-export function LiveCompare({ state }: { state: LiveState }) {
+export function LiveCompare({
+  state,
+  arena = "story",
+}: {
+  state: LiveState;
+  arena?: Arena;
+}) {
+  const isJoke = arena === "joke";
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [reveal, setReveal] = useState<Reveal | null>(null);
   const [viewed, setViewed] = useState<Set<Slot>>(new Set());
@@ -86,7 +94,7 @@ export function LiveCompare({ state }: { state: LiveState }) {
   if (reveal && selectedSlot) {
     return (
       <div className="mx-auto max-w-5xl">
-        <RevealPanel reveal={reveal} chosenSlot={selectedSlot} />
+        <RevealPanel reveal={reveal} chosenSlot={selectedSlot} arena={arena} />
       </div>
     );
   }
@@ -100,8 +108,12 @@ export function LiveCompare({ state }: { state: LiveState }) {
           {state.error
             ? "An error stopped the run"
             : state.ready
-              ? "All three pens have finished — cast your vote"
-              : "Three frontier pens · writing in parallel"}
+              ? isJoke
+                ? "All three comics have delivered — pick the funniest"
+                : "All three pens have finished — cast your vote"
+              : isJoke
+                ? "Three frontier comics · writing in parallel"
+                : "Three frontier pens · writing in parallel"}
         </span>
         <span className="hairline flex-1" />
       </div>
@@ -114,6 +126,7 @@ export function LiveCompare({ state }: { state: LiveState }) {
         onViewed={handleViewed}
         onScrollDepth={handleScrollDepth}
         renderStreaming={(slot) => !state.slotsDone.has(slot)}
+        arena={arena}
       />
 
       {state.ready && state.runId ? (
@@ -124,13 +137,14 @@ export function LiveCompare({ state }: { state: LiveState }) {
           startTime={startTime}
           scrollDepths={scrollDepths}
           onVoted={setReveal}
+          arena={arena}
         />
       ) : state.error ? (
         <div className="mx-auto mt-12 max-w-xl text-center">
           <p className="font-serif text-lg italic text-ink">{state.error}</p>
           <p className="mt-4">
             <Link
-              href="/"
+              href={ARENA_COPY[arena].home}
               className="editorial-caps text-oxblood underline underline-offset-4 hover:text-oxblood-deep"
             >
               Try another prompt
@@ -140,7 +154,9 @@ export function LiveCompare({ state }: { state: LiveState }) {
       ) : (
         <div className="mx-auto mt-10 max-w-md text-center">
           <p className="font-serif text-sm italic text-ink-muted">
-            The press runs slowly — {state.slotsDone.size} of 3 pens finished.
+            {isJoke
+              ? `Comedy is timing — ${state.slotsDone.size} of 3 jokes delivered.`
+              : `The press runs slowly — ${state.slotsDone.size} of 3 pens finished.`}
           </p>
         </div>
       )}

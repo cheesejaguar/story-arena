@@ -4,6 +4,7 @@ import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { StoryMarkdownLazy } from "./story-markdown-lazy";
 import type { Slot } from "@/lib/utils/randomize-slots";
+import { ARENA_COPY, type Arena } from "@/lib/arena";
 
 export type StoryCardProps = {
   slot: Slot;
@@ -12,6 +13,7 @@ export type StoryCardProps = {
   disabled?: boolean;
   /** When true, show plain text + cursor instead of parsing Markdown. */
   streaming?: boolean;
+  arena?: Arena;
   onSelect: () => void;
 };
 
@@ -21,8 +23,10 @@ export function StoryCard({
   selected,
   disabled,
   streaming,
+  arena = "story",
   onSelect,
 }: StoryCardProps) {
+  const unit = ARENA_COPY[arena].unit;
   function handleSelect() {
     if (disabled) return;
     onSelect();
@@ -35,7 +39,7 @@ export function StoryCard({
         tabIndex={disabled ? -1 : 0}
         aria-pressed={selected}
         aria-disabled={disabled || undefined}
-        aria-label={`Story ${slot}${selected ? ", your pick" : ""}`}
+        aria-label={`${unit} ${slot}${selected ? ", your pick" : ""}`}
         onClick={handleSelect}
         onKeyDown={(e) => {
           if (disabled) return;
@@ -55,7 +59,7 @@ export function StoryCard({
       >
         <header className="mb-5 flex items-baseline justify-between">
           <h2 className="editorial-caps text-ink-muted">
-            <span className="text-oxblood">❦</span>&nbsp;&nbsp;Story&nbsp;{slot}
+            <span className="text-oxblood">❦</span>&nbsp;&nbsp;{unit}&nbsp;{slot}
           </h2>
           {streaming ? (
             <span className="editorial-caps text-ink-faint animate-pulse">

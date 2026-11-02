@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import Link from "next/link";
 import { getRunWithOutputs } from "@/lib/db/queries";
 import { CompareClient } from "./compare-client";
+import { ARENA_COPY } from "@/lib/arena";
 
 export const runtime = "nodejs";
 
@@ -16,6 +17,8 @@ export default async function ComparePage({ params }: PageProps) {
   if (!data) {
     notFound();
   }
+
+  const copy = ARENA_COPY[data.run.arena];
 
   if (data.run.status !== "complete") {
     return (
@@ -32,11 +35,11 @@ export default async function ComparePage({ params }: PageProps) {
         <p className="mt-4 font-serif italic text-ink-muted">
           {data.run.status === "failed"
             ? "One or more models failed to generate. Try a fresh prompt."
-            : "Stories are still being generated. Refresh in a moment."}
+            : `${data.run.arena === "joke" ? "Jokes are" : "Stories are"} still being generated. Refresh in a moment.`}
         </p>
         <p className="mt-10">
           <Link
-            href="/"
+            href={copy.home}
             className="editorial-caps text-ink underline decoration-oxblood decoration-[1.5px] underline-offset-[6px] hover:text-oxblood"
           >
             Write a new prompt →
@@ -60,7 +63,7 @@ export default async function ComparePage({ params }: PageProps) {
         </p>
       </header>
 
-      <CompareClient runId={data.run.id} stories={stories} />
+      <CompareClient runId={data.run.id} stories={stories} arena={data.run.arena} />
     </div>
   );
 }

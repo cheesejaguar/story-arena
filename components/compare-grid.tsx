@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { StoryCard } from "./story-card";
 import type { Slot } from "@/lib/utils/randomize-slots";
+import type { Arena } from "@/lib/arena";
 
 export type CompareStory = {
   slot: Slot;
@@ -18,6 +19,7 @@ export type CompareGridProps = {
   onScrollDepth?: (slot: Slot, depth: number) => void;
   /** Optional hook — when returns true for a slot, that card shows a "writing…" shimmer. */
   renderStreaming?: (slot: Slot) => boolean;
+  arena?: Arena;
 };
 
 /**
@@ -34,6 +36,7 @@ export function CompareGrid({
   onViewed,
   onScrollDepth,
   renderStreaming,
+  arena,
 }: CompareGridProps) {
   const gridRef = useRef<HTMLDivElement>(null);
   const maxDepth = useRef<Partial<Record<Slot, number>>>({});
@@ -123,6 +126,7 @@ export function CompareGrid({
           selected={selectedSlot === story.slot}
           disabled={disabled}
           streaming={renderStreaming ? renderStreaming(story.slot) : false}
+          arena={arena}
           onSelect={() => onSelect(story.slot)}
         />
       ))}

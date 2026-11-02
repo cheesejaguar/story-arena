@@ -6,6 +6,7 @@ import { CompareGrid, type CompareStory } from "@/components/compare-grid";
 import { VotePanel, type Reveal } from "@/components/vote-panel";
 import { RevealPanel } from "@/components/reveal-panel";
 import type { Slot } from "@/lib/utils/randomize-slots";
+import { ARENA_COPY, type Arena } from "@/lib/arena";
 
 type JudgeRun = {
   id: string;
@@ -37,7 +38,8 @@ type Phase =
  * Judge mode — the bench where users vote on other people's blind runs.
  * Orchestrates a small state machine: loading → judging → revealed → (fetch next) → judging…
  */
-export function JudgeClient() {
+export function JudgeClient({ arena = "story" }: { arena?: Arena }) {
+  const copy = ARENA_COPY[arena];
   const [phase, setPhase] = useState<Phase>({ kind: "loading" });
   const [selectedSlot, setSelectedSlot] = useState<Slot | null>(null);
   const [viewed, setViewed] = useState<Set<Slot>>(new Set());
@@ -49,7 +51,10 @@ export function JudgeClient() {
 
   const applyNext = useCallback((data: JudgeResponse | null) => {
     if (!data) {
-      setPhase({ kind: "error", message: "Couldn't fetch a story. Try again." });
+      setPhase({
+        kind: "error",
+        message: `Couldn't fetch a ${copy.unit.toLowerCase()}. Try again.`,
+      });
       return;
     }
     if (!data.run) {
@@ -68,17 +73,19 @@ export function JudgeClient() {
     setStartTime(Date.now());
     // Scroll to top for the next story
     window.scrollTo({ top: 0, behavior: "smooth" });
-  }, []);
+  }, [copy.unit]);
 
   const loadNext = useCallback(async (): Promise<JudgeResponse | null> => {
     try {
-      const res = await fetch("/api/judge/next", { cache: "no-store" });
+      const res = await fetch(`/api/judge/next?arena=${arena}`, {
+        cache: "no-store",
+      });
       if (!res.ok) return null;
       return (await res.json()) as JudgeResponse;
     } catch {
       return null;
     }
-  }, []);
+  }, [arena]);
 
   const fetchNext = useCallback(async () => {
     const data = await loadNext();
@@ -139,7 +146,9 @@ export function JudgeClient() {
   if (phase.kind === "loading") {
     return (
       <div className="mx-auto mt-20 max-w-xl text-center">
-        <p className="editorial-caps text-ink-muted">Fetching a story</p>
+        <p className="editorial-caps text-ink-muted">
+          Fetching a {copy.unit.toLowerCase()}
+        </p>
         <div className="mx-auto mt-4 flex w-12 items-center justify-center gap-1">
           <span className="h-1 w-1 animate-pulse rounded-full bg-ink" />
           <span className="h-1 w-1 animate-pulse rounded-full bg-ink [animation-delay:150ms]" />
@@ -172,18 +181,20 @@ export function JudgeClient() {
           <span className="text-oxblood text-lg leading-none">❦</span>
           <span className="hairline flex-1" />
         </div>
-        <p className="editorial-caps text-ink-muted">No pending stories</p>
+        <p className="editorial-caps text-ink-muted">
+          No pending {copy.unitPlural}
+        </p>
         <h1 className="mt-4 font-display text-4xl italic text-ink">
           You&apos;ve judged them all.
         </h1>
         <p className="mt-4 font-serif italic text-ink-muted">
           {phase.votedByYou > 0
-            ? `You've cast ${phase.votedByYou.toLocaleString()} ${phase.votedByYou === 1 ? "verdict" : "verdicts"} so far. Come back when fresh stories have been written — or write one yourself.`
-            : "Come back once some stories have been written."}
+            ? `You've cast ${phase.votedByYou.toLocaleString()} ${phase.votedByYou === 1 ? "verdict" : "verdicts"} so far. Come back when fresh ${copy.unitPlural} have been written — or write one yourself.`
+            : `Come back once some ${copy.unitPlural} have been written.`}
         </p>
         <div className="mt-10">
           <Link
-            href="/"
+            href={copy.home}
             className="editorial-caps text-ink underline decoration-oxblood decoration-[1.5px] underline-offset-[6px] hover:text-oxblood"
           >
             Write your own prompt →
@@ -224,8 +235,9 @@ export function JudgeClient() {
           reveal={phase.reveal}
           chosenSlot={phase.chosenSlot}
           subtitle={`${phase.votedByYou.toLocaleString()} judged — ${phase.remaining.toLocaleString()} still waiting for you`}
+          arena={arena}
           primaryAction={{
-            label: "Next story",
+            label: `Next ${copy.unit.toLowerCase()}`,
             onClick: handleNext,
             loading: nextLoading,
           }}
@@ -239,6 +251,7 @@ export function JudgeClient() {
             onSelect={setSelectedSlot}
             onViewed={handleViewed}
             onScrollDepth={handleScrollDepth}
+            arena={arena}
           />
           <VotePanel
             runId={run.id}
@@ -247,6 +260,7 @@ export function JudgeClient() {
             startTime={startTime}
             scrollDepths={scrollDepths}
             onVoted={handleVoted}
+            arena={arena}
           />
         </>
       )}

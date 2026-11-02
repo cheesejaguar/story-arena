@@ -16,7 +16,8 @@
     "test:e2e": "playwright test",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx --env-file .env.local lib/db/migrate.ts",
-    "db:seed:reddit": "tsx --env-file .env.local scripts/seed-reddit-prompts.ts"
+    "db:seed:reddit": "tsx --env-file .env.local scripts/seed-reddit-prompts.ts",
+    "fetch:reddit:jokes": "tsx scripts/fetch-reddit-joke-prompts.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.9.0",

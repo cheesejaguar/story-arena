@@ -18,11 +18,14 @@ export const slotEnum = pgEnum("slot_label", ["A", "B", "C"]);
 export const runStatusEnum = pgEnum("run_status", ["pending", "complete", "failed"]);
 export const lengthEnum = pgEnum("length_bucket", ["short", "medium", "long"]);
 export const moderationStatusEnum = pgEnum("moderation_status", ["allowed", "blocked"]);
+export const arenaEnum = pgEnum("arena", ["story", "joke"]);
 
 export const runs = pgTable("runs", {
   id: uuid("id").primaryKey().defaultRandom(),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   sessionId: text("session_id").notNull(),
+  /** Which contest this run belongs to. Stats and the Bench filter on it. */
+  arena: arenaEnum("arena").notNull().default("story"),
   promptText: text("prompt_text").notNull(),
   promptHash: text("prompt_hash").notNull(),
   promptLengthBucket: lengthEnum("prompt_length_bucket").notNull(),
@@ -50,6 +53,7 @@ export const runs = pgTable("runs", {
   index("runs_status_created_idx").on(t.status, t.createdAt),
   index("runs_roster_created_idx").on(t.rosterId, t.createdAt),
   index("runs_dedupe_idx").on(t.dedupeKey, t.createdAt),
+  index("runs_arena_status_created_idx").on(t.arena, t.status, t.createdAt),
   check("runs_prompt_text_len", sql`length(prompt_text) <= 4000`),
   foreignKey({
     columns: [t.sourceRunId],

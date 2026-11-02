@@ -37,6 +37,7 @@ import {
   markRunFailed,
 } from "@/lib/db/queries";
 import { env } from "@/lib/env";
+import { JOKE_LENGTH_BUCKET, JOKE_SYSTEM_PROMPT_VERSION } from "@/lib/arena";
 import { logger } from "@/lib/utils/logger";
 import { invalidateStatsCache } from "@/lib/db/stats-cache";
 
@@ -134,14 +135,19 @@ export async function POST(req: Request) {
     );
   }
 
-  const { prompt, length } = parsed.data;
+  const { prompt, arena } = parsed.data;
+  // Jokes have no length picker and their own versioned system prompt. The
+  // version is part of the dedupe key, so a joke never replays a story.
+  const length = arena === "joke" ? JOKE_LENGTH_BUCKET : parsed.data.length;
+  const systemPromptVersion =
+    arena === "joke" ? JOKE_SYSTEM_PROMPT_VERSION : env.SYSTEM_PROMPT_VERSION;
   const promptHash = hashPrompt(prompt);
   const roster = ACTIVE_ROSTER;
   const dedupeKey = buildDedupeKey({
     prompt,
     length,
     rosterId: roster.id,
-    systemPromptVersion: env.SYSTEM_PROMPT_VERSION,
+    systemPromptVersion,
   });
 
   const rawIdempotencyKey = req.headers.get("idempotency-key");
@@ -172,7 +178,7 @@ export async function POST(req: Request) {
     }
   }
 
-  logger.info({ sessionId, length, promptHash }, "run.created.pending");
+  logger.info({ sessionId, arena, length, promptHash }, "run.created.pending");
 
   const moderation = await moderatePrompt(prompt);
   if (!moderation.allowed) {
@@ -210,6 +216,7 @@ export async function POST(req: Request) {
       const run = await createPendingRun({
         id: replayRunId,
         sessionId,
+        arena: replaySource.run.arena,
         promptText: prompt,
         promptHash,
         promptLengthBucket: length,
@@ -271,7 +278,12 @@ export async function POST(req: Request) {
   }
 
   // ── Spend + concurrency gates ─────────────────────────────────────────
-  const estimateMicroUsd = estimateRunCostMicroUsdForPrompt(roster, prompt, length);
+  const estimateMicroUsd = estimateRunCostMicroUsdForPrompt(
+    roster,
+    prompt,
+    length,
+    arena,
+  );
   const spend = await reserveSpend(estimateMicroUsd);
   if (!spend.ok) {
     return NextResponse.json(
@@ -301,12 +313,13 @@ export async function POST(req: Request) {
   try {
     run = await createPendingRun({
       sessionId,
+      arena,
       promptText: prompt,
       promptHash,
       promptLengthBucket: length,
       normalizedPrompt: prompt.trim(),
       moderationStatus: "allowed",
-      systemPromptVersion: env.SYSTEM_PROMPT_VERSION,
+      systemPromptVersion,
       rosterId: roster.id,
       dedupeKey,
       sourceRunId: null,
@@ -380,7 +393,8 @@ export async function POST(req: Request) {
         const generator = streamBenchmarkRun({
           prompt: prompt.trim(),
           length,
-          systemPromptVersion: env.SYSTEM_PROMPT_VERSION,
+          arena,
+          systemPromptVersion,
           roster,
           signal: abortController.signal,
           timeoutMs: env.GENERATION_TIMEOUT_MS,

@@ -1,6 +1,7 @@
 import type { ModelRoster } from "@/lib/ai/models";
 import { estimateRunCostMicroUsd } from "@/lib/ai/models";
-import { lengthToTargetTokens, type LengthBucket } from "./length";
+import { targetTokensFor, type LengthBucket } from "./length";
+import type { Arena } from "@/lib/arena";
 
 /** Convert integer micro-USD to USD. */
 export function microUsdToUsd(micro: number): number {
@@ -30,8 +31,9 @@ export function estimateRunCostMicroUsdForPrompt(
   roster: ModelRoster,
   prompt: string,
   length: LengthBucket,
+  arena: Arena = "story",
 ): number {
   const inputTokens = estimatePromptTokens(prompt);
-  const outputTokens = Math.ceil(lengthToTargetTokens(length) * 1.2);
+  const outputTokens = Math.ceil(targetTokensFor(arena, length) * 1.2);
   return estimateRunCostMicroUsd(roster, inputTokens, outputTokens);
 }
