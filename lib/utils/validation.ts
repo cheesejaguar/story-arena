@@ -1,9 +1,19 @@
 import { z } from "zod";
+import { JOKE_PROMPT_MAX_CHARS } from "@/lib/arena";
 
-export const CreateRunSchema = z.object({
-  prompt: z.string().trim().min(4).max(4000),
-  length: z.enum(["short", "medium", "long"]).default("medium"),
-});
+export const CreateRunSchema = z
+  .object({
+    prompt: z.string().trim().min(4).max(4000),
+    length: z.enum(["short", "medium", "long"]).default("medium"),
+    arena: z.enum(["story", "joke"]).default("story"),
+  })
+  .refine(
+    (v) => v.arena !== "joke" || v.prompt.length <= JOKE_PROMPT_MAX_CHARS,
+    {
+      path: ["prompt"],
+      message: `Joke prompts must be ${JOKE_PROMPT_MAX_CHARS} characters or fewer`,
+    },
+  );
 
 export const SubmitVoteSchema = z.object({
   runId: z.uuid(),

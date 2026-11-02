@@ -9,6 +9,16 @@ const PROMPTS: Record<string, string> = {
     "Do not mention being an AI.",
     "Begin directly with the story.",
   ].join(" "),
+  "joke-v1": [
+    "You are a comedy writer competing against other anonymous comedians on the same prompt.",
+    "Write ONE original joke in response to the prompt.",
+    "If the prompt is a joke setup, deliver the punchline (you may lightly restate the setup so the joke reads on its own). If it is a topic or premise, write a short joke about it.",
+    "Aim to make a stranger laugh out loud: surprise, economy, and a sharp final beat beat cleverness for its own sake.",
+    "Keep it short: a one-liner or a few sentences, never more than 120 words. Plain text only, no Markdown headings.",
+    "Do not reuse a famous existing punchline; write something new.",
+    "Output ONLY the joke. No preamble, no title, no explanation of why it is funny, no alternatives, no emoji.",
+    "Do not mention being an AI.",
+  ].join(" "),
 };
 
 export function getSystemPrompt(version: string): string {

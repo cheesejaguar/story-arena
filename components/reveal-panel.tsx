@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { getModelLabel } from "@/lib/ai/models";
 import type { Slot } from "@/lib/utils/randomize-slots";
 import type { Reveal } from "./vote-panel";
+import { ARENA_COPY, type Arena } from "@/lib/arena";
 
 const SLOTS: Slot[] = ["A", "B", "C"];
 
@@ -27,15 +28,18 @@ export function RevealPanel({
   chosenSlot,
   primaryAction,
   subtitle,
+  arena = "story",
 }: {
   reveal: Reveal;
   chosenSlot: Slot;
   primaryAction?: RevealPrimaryAction;
   subtitle?: string;
+  arena?: Arena;
 }) {
+  const copy = ARENA_COPY[arena];
   const action: RevealPrimaryAction = primaryAction ?? {
     label: "Try another prompt",
-    href: "/",
+    href: copy.home,
   };
 
   return (
@@ -71,7 +75,9 @@ export function RevealPanel({
                   : "opacity-85",
               )}
             >
-              <p className="editorial-caps text-ink-muted">Story {slot}</p>
+              <p className="editorial-caps text-ink-muted">
+                {copy.unit} {slot}
+              </p>
               <p className="mt-3 font-display text-xl italic font-normal leading-tight text-ink">
                 {getModelLabel(reveal[slot])}
               </p>
@@ -117,7 +123,7 @@ export function RevealPanel({
         )}
 
         <Link
-          href="/"
+          href={copy.home}
           className="editorial-caps text-ink-muted underline underline-offset-4 hover:text-oxblood"
         >
           or write your own prompt

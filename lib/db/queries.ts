@@ -5,6 +5,7 @@ import { eq, and, sql, desc, asc, gte, lt } from "drizzle-orm";
 import { randomInt } from "node:crypto";
 import type { Slot } from "@/lib/utils/randomize-slots";
 import type { LengthBucket } from "@/lib/utils/length";
+import type { Arena } from "@/lib/arena";
 
 export async function createPendingRun(
   input: Omit<typeof runs.$inferInsert, "status">,
@@ -95,24 +96,25 @@ export async function insertVote(input: typeof votes.$inferInsert) {
   return row;
 }
 
-export async function getAggregateModelStats(rosterId?: string) {
-  if (rosterId) {
-    return db
-      .select({
-        modelSlug: votes.chosenModelSlug,
-        wins: sql<number>`count(*)::int`,
-      })
-      .from(votes)
-      .innerJoin(runs, eq(runs.id, votes.runId))
-      .where(eq(runs.rosterId, rosterId))
-      .groupBy(votes.chosenModelSlug);
-  }
+/** Arena filter, plus an optional roster filter, for vote aggregates. */
+function statsWhere(arena: Arena, rosterId?: string) {
+  return rosterId
+    ? and(eq(runs.arena, arena), eq(runs.rosterId, rosterId))
+    : eq(runs.arena, arena);
+}
+
+export async function getAggregateModelStats(
+  rosterId?: string,
+  arena: Arena = "story",
+) {
   return db
     .select({
       modelSlug: votes.chosenModelSlug,
       wins: sql<number>`count(*)::int`,
     })
     .from(votes)
+    .innerJoin(runs, eq(runs.id, votes.runId))
+    .where(statsWhere(arena, rosterId))
     .groupBy(votes.chosenModelSlug);
 }
 
@@ -140,9 +142,13 @@ export async function getRunStatusCounts() {
  * grows. The count is over the same predicate, so the offset is always in
  * range.
  */
-export async function getRandomUnvotedRun(sessionId: string) {
+export async function getRandomUnvotedRun(
+  sessionId: string,
+  arena: Arena = "story",
+) {
   const where = and(
     eq(runs.status, "complete"),
+    eq(runs.arena, arena),
     sql`NOT EXISTS (SELECT 1 FROM ${votes} WHERE ${votes.runId} = ${runs.id} AND ${votes.sessionId} = ${sessionId})`,
   );
 
@@ -205,22 +211,18 @@ export async function findReplayableRun(
  */
 export async function getWinsByLength(
   rosterId?: string,
+  arena: Arena = "story",
 ): Promise<Array<{ length: LengthBucket; modelSlug: string; wins: number }>> {
-  const base = db
+  return db
     .select({
       length: runs.promptLengthBucket,
       modelSlug: votes.chosenModelSlug,
       wins: sql<number>`count(*)::int`,
     })
     .from(votes)
-    .innerJoin(runs, eq(runs.id, votes.runId));
-
-  if (rosterId) {
-    return base
-      .where(eq(runs.rosterId, rosterId))
-      .groupBy(runs.promptLengthBucket, votes.chosenModelSlug);
-  }
-  return base.groupBy(runs.promptLengthBucket, votes.chosenModelSlug);
+    .innerJoin(runs, eq(runs.id, votes.runId))
+    .where(statsWhere(arena, rosterId))
+    .groupBy(runs.promptLengthBucket, votes.chosenModelSlug);
 }
 
 /**
@@ -231,30 +233,32 @@ export async function getWinsByLength(
  */
 export async function getSlotDistribution(
   rosterId?: string,
+  arena: Arena = "story",
 ): Promise<Array<{ slot: Slot; count: number }>> {
-  const base = db
+  return db
     .select({
       slot: votes.chosenSlot,
       count: sql<number>`count(*)::int`,
     })
     .from(votes)
-    .innerJoin(runs, eq(runs.id, votes.runId));
-
-  if (rosterId) {
-    return base.where(eq(runs.rosterId, rosterId)).groupBy(votes.chosenSlot);
-  }
-  return base.groupBy(votes.chosenSlot);
+    .innerJoin(runs, eq(runs.id, votes.runId))
+    .where(statsWhere(arena, rosterId))
+    .groupBy(votes.chosenSlot);
 }
 
 /**
  * Number of runs the given session has voted on (for "you've judged X stories"
  * stats on the /judge page).
  */
-export async function countVotesBySession(sessionId: string): Promise<number> {
+export async function countVotesBySession(
+  sessionId: string,
+  arena: Arena = "story",
+): Promise<number> {
   const rows = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(votes)
-    .where(eq(votes.sessionId, sessionId));
+    .innerJoin(runs, eq(runs.id, votes.runId))
+    .where(and(eq(votes.sessionId, sessionId), eq(runs.arena, arena)));
   return rows[0]?.count ?? 0;
 }
 
@@ -262,13 +266,17 @@ export async function countVotesBySession(sessionId: string): Promise<number> {
  * Total number of completed runs minus the ones this session has voted on.
  * Used to render "12 stories waiting for you" on the judge landing card.
  */
-export async function countUnvotedRuns(sessionId: string): Promise<number> {
+export async function countUnvotedRuns(
+  sessionId: string,
+  arena: Arena = "story",
+): Promise<number> {
   const rows = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(runs)
     .where(
       and(
         eq(runs.status, "complete"),
+        eq(runs.arena, arena),
         sql`NOT EXISTS (SELECT 1 FROM ${votes} WHERE ${votes.runId} = ${runs.id} AND ${votes.sessionId} = ${sessionId})`,
       ),
     );
@@ -283,7 +291,9 @@ export type SeasonSummary = {
 };
 
 /** Seasons that actually have data, newest first. */
-export async function listSeasonSummaries(): Promise<SeasonSummary[]> {
+export async function listSeasonSummaries(
+  arena: Arena = "story",
+): Promise<SeasonSummary[]> {
   return db
     .select({
       rosterId: runs.rosterId,
@@ -293,6 +303,7 @@ export async function listSeasonSummaries(): Promise<SeasonSummary[]> {
     })
     .from(runs)
     .leftJoin(votes, eq(votes.runId, runs.id))
+    .where(eq(runs.arena, arena))
     .groupBy(runs.rosterId)
     .orderBy(desc(sql`max(${runs.createdAt})`));
 }

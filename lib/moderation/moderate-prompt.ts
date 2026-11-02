@@ -13,8 +13,8 @@ const Verdict = z.object({
 });
 
 const SYSTEM_PROMPT = [
-  "You are a fiction-prompt safety reviewer.",
-  "Allow most creative writing prompts, including dark, violent, romantic, or politically sensitive themes.",
+  "You are a safety reviewer for fiction and comedy prompts.",
+  "Allow most creative writing and joke prompts, including dark, violent, romantic, edgy, or politically sensitive themes.",
   "Block only prompts that request: sexual content involving minors, instructions for real-world weapons of mass destruction, or targeted harassment of real people.",
   "Default to allowed=true for borderline cases.",
 ].join(" ");
@@ -92,7 +92,7 @@ export async function moderatePrompt(
       model: MODERATION_MODEL.slug,
       output: Output.object({ schema: Verdict }),
       system: SYSTEM_PROMPT,
-      prompt: `Review this fiction prompt:\n\n${trimmed}`,
+      prompt: `Review this creative prompt:\n\n${trimmed}`,
       maxOutputTokens: 200,
       maxRetries: 0,
       timeout: 15_000,

@@ -7,7 +7,8 @@ import {
   type BenchmarkModel,
   type ModelSlug,
 } from "./models";
-import { lengthToTargetTokens, type LengthBucket } from "@/lib/utils/length";
+import { targetTokensFor, type LengthBucket } from "@/lib/utils/length";
+import type { Arena } from "@/lib/arena";
 import { estimatePromptTokens } from "@/lib/utils/cost";
 
 export type StoryMeta = {
@@ -29,6 +30,8 @@ export type GenerateInput = {
   prompt: string;
   modelSlug: ModelSlug;
   length: LengthBucket;
+  /** Sizes the output budget; jokes get a much smaller one. Defaults to story. */
+  arena?: Arena;
   systemPromptVersion: string;
   /** Cancels the upstream request when the client disconnects. */
   signal?: AbortSignal;
@@ -63,8 +66,12 @@ export async function* generateStoryStream(
 ): AsyncGenerator<StoryStreamEvent, void, void> {
   if (input.signal?.aborted) throw abortError();
 
+  const arena = input.arena ?? "story";
+
   if (process.env.MOCK_AI === "1") {
-    const mockText = `# The Lighthouse at the Edge
+    const mockText = arena === "joke"
+      ? `I asked *${input.modelSlug.split("/")[1]}* for a punchline. It said the timing was everything, then took forty seconds to answer.`
+      : `# The Lighthouse at the Edge
 
 It was a quiet evening when the lighthouse beam first **faltered**. The keeper — *${input.modelSlug.split("/")[1]}* — had spent forty years on the rock and could feel the change in the air before the bulb hissed.
 
@@ -107,7 +114,7 @@ In the salt-dark between sweeps, she heard a second voice answer her own.`;
     prompt: input.prompt,
     // Leave headroom above the prose target for titles and formatting, but
     // never enough to let a runaway reasoning model bill indefinitely.
-    maxOutputTokens: Math.ceil(lengthToTargetTokens(input.length) * 1.2) + 200,
+    maxOutputTokens: Math.ceil(targetTokensFor(arena, input.length) * 1.2) + 200,
     // GPT-5-class reasoning models reject temperature when reasoning is on.
     temperature: model.provider === "openai" ? undefined : 0.9,
     providerOptions: reasoningProviderOptions(model),
@@ -130,8 +137,9 @@ In the salt-dark between sweeps, she heard a second voice answer her own.`;
 
   if (input.signal?.aborted) throw abortError();
 
-  if (accumulated.trim().length < 20) {
-    throw new Error("Model returned an empty or near-empty story");
+  // A one-liner can legitimately be short; a story cannot.
+  if (accumulated.trim().length < (arena === "joke" ? 10 : 20)) {
+    throw new Error("Model returned an empty or near-empty response");
   }
   if (finishReason === "length") {
     throw new Error("Model hit the output token limit before finishing");

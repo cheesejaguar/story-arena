@@ -16,6 +16,7 @@ export async function GET(
   // Only slot + text reaches the client.
   return NextResponse.json({
     runId: data.run.id,
+    arena: data.run.arena,
     prompt: data.run.promptText,
     length: data.run.promptLengthBucket,
     stories: data.outputs

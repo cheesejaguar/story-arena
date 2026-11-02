@@ -7,6 +7,9 @@ import {
 import { ACTIVE_ROSTER, getRoster } from "@/lib/ai/models";
 import { wilsonInterval } from "@/lib/utils/stats";
 import type { LengthBucket } from "@/lib/utils/length";
+import Link from "next/link";
+import { ARENAS, parseArena, type Arena } from "@/lib/arena";
+import { cn } from "@/lib/utils";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic"; // no caching of vote totals
@@ -18,16 +21,28 @@ const LENGTH_LABELS: Record<LengthBucket, string> = {
   long: "Extended",
 };
 
+const ARENA_TABS: Record<Arena, { label: string; href: string }> = {
+  story: { label: "Fiction", href: "/results" },
+  joke: { label: "Jokes", href: "/results?arena=joke" },
+};
+
 function pct(n: number): string {
   return `${(n * 100).toFixed(1)}%`;
 }
 
-export default async function ResultsPage() {
+export default async function ResultsPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
+}) {
+  const arena = parseArena((await searchParams).arena);
+  const isJoke = arena === "joke";
   const [aggregate, slotDist, winsByLength, seasons] = await Promise.all([
-    getCachedAggregateModelStats(ACTIVE_ROSTER.id),
-    getCachedSlotDistribution(ACTIVE_ROSTER.id),
-    getCachedWinsByLength(ACTIVE_ROSTER.id),
-    getCachedSeasonSummaries(),
+    getCachedAggregateModelStats(ACTIVE_ROSTER.id, arena),
+    getCachedSlotDistribution(ACTIVE_ROSTER.id, arena),
+    // Every joke run is the same length, so the breakdown is fiction-only.
+    isJoke ? Promise.resolve([]) : getCachedWinsByLength(ACTIVE_ROSTER.id, arena),
+    getCachedSeasonSummaries(arena),
   ]);
 
   const totalVotes = aggregate.reduce((s, r) => s + r.wins, 0);
@@ -81,6 +96,26 @@ export default async function ResultsPage() {
           <span className="text-oxblood text-base leading-none">❦</span>
           <span className="hairline flex-1" />
         </div>
+        <nav
+          aria-label="Arena"
+          className="mt-8 inline-flex items-center divide-x divide-rule/60"
+        >
+          {ARENAS.map((a) => (
+            <Link
+              key={a}
+              href={ARENA_TABS[a].href}
+              aria-current={a === arena ? "page" : undefined}
+              className={cn(
+                "editorial-caps px-4 py-1 transition-colors",
+                a === arena
+                  ? "text-ink underline decoration-oxblood decoration-[1.5px] underline-offset-[6px]"
+                  : "text-ink-faint hover:text-ink",
+              )}
+            >
+              {ARENA_TABS[a].label}
+            </Link>
+          ))}
+        </nav>
         <p className="mt-6 font-serif text-lg italic text-ink-muted">
           {totalVotes === 0 ? (
             <>No votes yet. Be the first.</>
@@ -174,55 +209,57 @@ export default async function ResultsPage() {
       </section>
 
       {/* ── By length bucket ─────────────────────────────────────── */}
-      <section className="mb-16">
-        <div className="mb-6 flex items-center gap-4">
-          <span className="editorial-caps text-ink-muted">
-            <span className="text-oxblood">§</span>&nbsp;&nbsp;By length
-          </span>
-          <span className="hairline flex-1" />
-        </div>
+      {!isJoke && (
+        <section className="mb-16">
+          <div className="mb-6 flex items-center gap-4">
+            <span className="editorial-caps text-ink-muted">
+              <span className="text-oxblood">§</span>&nbsp;&nbsp;By length
+            </span>
+            <span className="hairline flex-1" />
+          </div>
 
-        <div className="grid gap-8 sm:grid-cols-3">
-          {LENGTHS.map((len) => {
-            const lenTotal = totalsByLength.get(len) ?? 0;
-            return (
-              <div key={len}>
-                <div className="mb-3 flex items-baseline justify-between">
-                  <p className="editorial-caps text-ink">{LENGTH_LABELS[len]}</p>
-                  <p className="font-mono text-xs tabular-nums text-ink-faint">
-                    {lenTotal.toLocaleString()}
-                  </p>
-                </div>
-                <div className="space-y-3">
-                  {ACTIVE_ROSTER.models.map((m) => {
-                    const wins = lengthIndex.get(`${len}::${m.slug}`) ?? 0;
-                    const share = lenTotal === 0 ? 0 : wins / lenTotal;
-                    return (
-                      <div key={m.slug}>
-                        <div className="flex items-baseline justify-between gap-2 text-xs">
-                          <span className="font-serif italic text-ink">
-                            {m.label}
-                          </span>
-                          <span className="font-mono tabular-nums text-ink-muted">
-                            {pct(share)}
-                          </span>
+          <div className="grid gap-8 sm:grid-cols-3">
+            {LENGTHS.map((len) => {
+              const lenTotal = totalsByLength.get(len) ?? 0;
+              return (
+                <div key={len}>
+                  <div className="mb-3 flex items-baseline justify-between">
+                    <p className="editorial-caps text-ink">{LENGTH_LABELS[len]}</p>
+                    <p className="font-mono text-xs tabular-nums text-ink-faint">
+                      {lenTotal.toLocaleString()}
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    {ACTIVE_ROSTER.models.map((m) => {
+                      const wins = lengthIndex.get(`${len}::${m.slug}`) ?? 0;
+                      const share = lenTotal === 0 ? 0 : wins / lenTotal;
+                      return (
+                        <div key={m.slug}>
+                          <div className="flex items-baseline justify-between gap-2 text-xs">
+                            <span className="font-serif italic text-ink">
+                              {m.label}
+                            </span>
+                            <span className="font-mono tabular-nums text-ink-muted">
+                              {pct(share)}
+                            </span>
+                          </div>
+                          <div className="mt-1 h-1 bg-paper-deep">
+                            <div
+                              className="h-full bg-ink"
+                              style={{ width: `${share * 100}%` }}
+                              aria-hidden
+                            />
+                          </div>
                         </div>
-                        <div className="mt-1 h-1 bg-paper-deep">
-                          <div
-                            className="h-full bg-ink"
-                            style={{ width: `${share * 100}%` }}
-                            aria-hidden
-                          />
-                        </div>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            );
-          })}
-        </div>
-      </section>
+              );
+            })}
+          </div>
+        </section>
+      )}
 
       {/* ── Slot-bias diagnostic ─────────────────────────────────── */}
       <section className="mb-16">
@@ -330,8 +367,9 @@ export default async function ResultsPage() {
         <span className="hairline flex-1" />
       </div>
       <p className="mt-4 text-center font-serif text-xs italic text-ink-muted">
-        Human preference for fiction — not objective literary quality. Read
-        with the caveat on the Colophon.
+        {isJoke
+          ? "Human preference for jokes — what made people on this site laugh, not a universal measure of funny."
+          : "Human preference for fiction — not objective literary quality. Read with the caveat on the Colophon."}
       </p>
     </div>
   );

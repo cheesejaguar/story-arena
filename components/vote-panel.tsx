@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import type { Slot } from "@/lib/utils/randomize-slots";
+import { ARENA_COPY, type Arena } from "@/lib/arena";
 
 export type Reveal = Record<"A" | "B" | "C", string>;
 
@@ -15,6 +16,7 @@ export type VotePanelProps = {
   startTime: number;
   scrollDepths: Partial<Record<Slot, number>>;
   onVoted: (reveal: Reveal) => void;
+  arena?: Arena;
 };
 
 export function VotePanel({
@@ -24,7 +26,9 @@ export function VotePanel({
   startTime,
   scrollDepths,
   onVoted,
+  arena = "story",
 }: VotePanelProps) {
+  const copy = ARENA_COPY[arena];
   const [reason, setReason] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -83,7 +87,11 @@ export function VotePanel({
       <Textarea
         value={reason}
         onChange={(e) => setReason(e.target.value)}
-        placeholder="A line about why, if you like. Optional."
+        placeholder={
+          arena === "joke"
+            ? "What made it land? Optional."
+            : "A line about why, if you like. Optional."
+        }
         rows={2}
         maxLength={500}
         disabled={submitting}
@@ -101,8 +109,8 @@ export function VotePanel({
             {submitting
               ? "Recording"
               : selectedSlot
-                ? `Vote for Story ${selectedSlot}`
-                : "Pick a story to vote"}
+                ? `Vote for ${copy.unit} ${selectedSlot}`
+                : `Pick a ${copy.unit.toLowerCase()} to vote`}
           </span>
           <span className="text-xl not-italic">
             {submitting ? "…" : "→"}
